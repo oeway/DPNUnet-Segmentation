@@ -53,7 +53,7 @@ def gen_mask_from_geojson(files_proc, masks_to_create_value=['filled', 'edge', '
 
     weightedEdgeMasks = annotationUtils.WeightedEdgeMaskGenerator(sigma=8, w0=10)
     distMapMasks = annotationUtils.DistanceMapGenerator(truncate_distance=None)
-    weightedBoarderasks = annotationUtils.WeightedBoarderGenerator()
+    weightedBoarderMasks = annotationUtils.WeightedBoarderGenerator()
 
     # %% Loop over all files
     for i, file_proc in enumerate(files_proc):
@@ -142,7 +142,7 @@ def gen_mask_from_geojson(files_proc, masks_to_create_value=['filled', 'edge', '
             # Weighted boarder mask
             if 'weighted_boarder' in masks_to_create[annot_type]:
                 print(' .... creating weighted boarder masks .....')
-                mask_dict = weightedBoarderasks.generate(annot_dict,mask_dict)
+                mask_dict = weightedBoarderMasks.generate(annot_dict,mask_dict)
 
                 # Save
                 if infer:
