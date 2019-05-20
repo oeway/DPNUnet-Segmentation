@@ -41,4 +41,4 @@ class InFolderImageProvider(ReadingImageProvider):
         super().__init__(image_type, paths, fn_mapping, image_suffix, has_alpha)
 
     def __getitem__(self, item):
-        return self.image_type(self.paths, os.path.join(self.im_names[item], 'images', self.im_names[item] + '.png'), self.fn_mapping, self.has_alpha)
+        return self.image_type(self.paths, self.im_names[item], self.fn_mapping, self.has_alpha)
