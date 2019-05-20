@@ -84,34 +84,27 @@ class PaddedSigmoidImageType(SigmoidBorderImageType):
         return cv2.copyMakeBorder(data, 0, (32-rows%32), 0, (32-cols%32), cv2.BORDER_REFLECT)
 
 
-def train_bowl():
+def train_bowl(train_idx, val_idx):
     torch.backends.cudnn.benchmark = True
     im_type = BorderImageType if not config.sigmoid else SigmoidBorderImageType
     im_val_type = PaddedImageType if not config.sigmoid else PaddedSigmoidImageType
     ds = CachingImageProvider(im_type, paths, fn_mapping)
     val_ds = CachingImageProvider(im_val_type, paths, fn_mapping)
-    folds = get_csv_folds(ds, os.path.join(config.dataset_path, 'folds.csv'))
-    for fold, (train_idx, val_idx) in enumerate(folds):
-        if args.fold is not None and int(args.fold) != fold:
-            continue
-        train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=num_workers, transforms=aug_victor(.97))
+    fold = 1 , 
+    train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=num_workers, transforms=aug_victor(.97))
 
 
-def eval_bowl():
+def eval_bowl(val_indexes):
     global config
     test = not args.training
     im_val_type = PaddedImageType if not config.sigmoid else PaddedSigmoidImageType
     im_prov_type = InFolderImageProvider if test else ReadingImageProvider
     ds = im_prov_type(im_val_type, paths, fn_mapping)
-    if not test:
-        folds = get_csv_folds(ds, os.path.join(config.dataset_path, 'folds.csv'))
-    else:
-        folds = [([], list(range(len(ds)))) for i in range(4)]
     keval = FullImageEvaluator(config, ds, test=test, flips=3, num_workers=num_workers, border=0)
-    for fold, (t, e) in enumerate(folds):
-        if args.fold is not None and int(args.fold) != fold:
-            continue
-        keval.predict(fold, e)
+    fold = 1 
+    if args.fold is not None and int(args.fold) != fold:
+        continue
+    keval.predict(fold, val_indexes)
     if test and args.fold is None:
         merge_files(keval.save_dir)
 
