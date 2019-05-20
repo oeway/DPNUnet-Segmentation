@@ -2,8 +2,8 @@ import os
 import cv2
 from skimage import io
 import shutil
-from src.imgseg import segmentationUtils
-from src.imgseg import annotationUtils
+from imgseg import segmentationUtils
+from imgseg import annotationUtils
 from geojson import FeatureCollection, dump
 from skimage import measure
 
