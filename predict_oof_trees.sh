@@ -1,4 +1,4 @@
-pushd albu/src
+pushd ./src
 ./predict_oof.sh
 popd
 

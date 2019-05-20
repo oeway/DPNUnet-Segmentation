@@ -1,4 +1,4 @@
-pushd albu/src
+pushd ./src
 bash ./predict_test.sh
 popd
 

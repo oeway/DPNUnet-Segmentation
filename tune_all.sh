@@ -1,3 +1,3 @@
-pushd albu/src
+pushd ./src
 ./tune_all.sh
 popd
