@@ -17,6 +17,7 @@ import json
 from PIL import Image, ImageDraw
 from skimage import draw as skimage_draw
 from skimage import morphology
+from skimage import measure
 from scipy import ndimage
 
 from skimage.io import imsave
@@ -517,10 +518,10 @@ class WeightedBoarderGenerator(MaskGenerator):
     def generate(self, annot_dict, mask_dict):
         labels = mask_dict['labels']
  
-        tmp = dilation(labels > 0, square(9))    
-        tmp2 = watershed(tmp, labels, mask=tmp, watershed_line=True) > 0
+        tmp = morphology.dilation(labels > 0, morphology.square(9))
+        tmp2 = morphology.watershed(tmp, labels, mask=tmp, watershed_line=True) > 0
         tmp = tmp ^ tmp2
-        tmp = dilation(tmp, square(7))
+        tmp = morphology.dilation(tmp, morphology.square(7))
         msk = (255 * tmp).astype('uint8')
 
         props = measure.regionprops(labels)
@@ -542,10 +543,10 @@ class WeightedBoarderGenerator(MaskGenerator):
                         sz = 3
                 else:
                     sz = 3
-                    if props[labels[y0, x0] - 1].area < 300:
-                        sz = 1
-                    elif props[labels[y0, x0] - 1].area < 2000:
-                        sz = 2
+                    # if props[labels[y0, x0] - 1].area < 300:
+                    #     sz = 1
+                    # elif props[labels[y0, x0] - 1].area < 2000:
+                    #     sz = 2
                 uniq = np.unique(labels[max(0, y0-sz):min(labels.shape[0], y0+sz+1), max(0, x0-sz):min(labels.shape[1], x0+sz+1)])
                 if len(uniq[uniq > 0]) > 1:
                     msk1[y0, x0] = True

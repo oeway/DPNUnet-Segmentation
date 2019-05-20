@@ -1,10 +1,9 @@
 import os
-import os
 import cv2
 from skimage import io
 import shutil
-from imgseg import segmentationUtils
-from imgseg import annotationUtils
+from src.imgseg import segmentationUtils
+from src.imgseg import annotationUtils
 from geojson import FeatureCollection, dump
 from skimage import measure
 
@@ -33,9 +32,9 @@ def masks_to_annotation(datasets_dir, save_path):
             sample_path = os.path.join(save_path, file_id)
             if not os.path.exists(sample_path):
                 os.makedirs(sample_path)
-            io.imsave(os.path.join(sample_path, "mask.png"), mask_img)
-            shutil.copyfile(os.path.join(nucleis_dir, file.replace(".tif", ".png")),
-                            os.path.join(sample_path, "nuclei.png"))
+            # io.imsave(os.path.join(sample_path, "mask.png"), mask_img)
+            # shutil.copyfile(os.path.join(nucleis_dir, file.replace(".tif", ".png")),
+            #                 os.path.join(sample_path, "nuclei.png"))
             segmentationUtils.masks_to_polygon(mask, label=label, simplify_tol=simplify_tol,
                                                save_name=os.path.join(sample_path, "annotation.json"))
 
@@ -153,10 +152,13 @@ def gen_mask_from_geojson(files_proc, masks_to_create_value=['filled', 'edge', '
                             [cv2.IMWRITE_PNG_COMPRESSION, 9])
 
 if __name__ == "__main__":
-    datasets_dir = "/home/alex/Downloads/test/data"
-    # masks_dir = os.path.join(datasets_dir, "labels_all")
-    # nucleis_dir = os.path.join(datasets_dir, "labels_all")
-    masks_to_annotation(datasets_dir, "/home/alex/Downloads/test/data/anet/train")
-    # print(os.path.splitext("annotation.json"))
+    # datasets_dir = "/home/alex/Downloads/test/data"
+    # save_path = "/home/alex/Downloads/test/data/kaggle_data/train"
+    # masks_to_annotation(datasets_dir, save_path)
+
+    datasets_dir = "/home/alex/Downloads/test/data/masks_all/kaggle_data"
+    for file_id in os.listdir(os.path.join(datasets_dir, "train")):
+        file_path = os.path.join(datasets_dir, "train", file_id, "annotation.json")
+        gen_mask_from_geojson([file_path], masks_to_create_value=["weighted_boarder"])
 
 
