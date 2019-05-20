@@ -257,7 +257,7 @@ def masks_to_polygon(img_mask,label=None,simplify_tol=0, plot_simplify=False, sa
 
     # Save to json file
     if save_name:
-        feature_collection = FeatureCollection(features, bbox=[0, 0.0, img_mask.shape[1], img_mask.shape[0]])
+        feature_collection = FeatureCollection(features, bbox=[0, 0.0, img_mask.shape[1]-1, img_mask.shape[0]-1])
         with open(save_name, 'w') as f:
             dump(feature_collection, f)
             f.close()
