@@ -26,9 +26,9 @@ with open(args.config_path, 'r') as f:
 config = Config(**cfg)
 
 paths = {
-    'masks': 'masks_all',
-    'images': 'images_all',
-    'labels': 'labels_all',
+    'masks': 'mask.png',
+    'images': 'nuclei.png',
+    'labels': '',
 }
 
 fn_mapping = {
@@ -39,7 +39,6 @@ fn_mapping = {
 
 if args.training:
     paths = {k: os.path.join(config.dataset_path, p) for k, p in paths.items()}
-    print("训练路径是:", paths)
 else:
     paths = {"images": config.dataset_path}
 num_workers = 0 if os.name == 'nt' else 4
@@ -109,5 +108,8 @@ def eval_bowl(val_indexes):
         merge_files(keval.save_dir)
 
 if __name__ == "__main__":
-    train_bowl()
+    train_bowl(
+        ['0a7d30b252359a10fd298b638b90cb9ada3acced4e0c0e5a3692013f432ee4e9', '0acd2c223d300ea55d0546797713851e818e5c697d073b7f4091b96ce0f3d2fe'],
+        ['00ae65c1c6631ae6f2be1a449902976e6eb8483bf6b0740d00530220832c6d3e', '0b0d577159f0d6c266f360f7b8dfde46e16fa665138bf577ec3c6f9c70c0cd1e']
+    )
 
