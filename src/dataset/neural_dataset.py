@@ -2,10 +2,10 @@ import random
 
 import numpy as np
 
-from ..augmentations.composition import Compose
-from ..augmentations.transforms import ToTensor
-from ..dataset.abstract_image_provider import AbstractImageProvider
-from .image_cropper import ImageCropper, DVCropper
+from augmentations.composition import Compose
+from augmentations.transforms import ToTensor
+from dataset.abstract_image_provider import AbstractImageProvider
+from dataset.image_cropper import ImageCropper, DVCropper
 
 
 class Dataset:

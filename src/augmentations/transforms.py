@@ -1,7 +1,7 @@
 import random
 import numpy as np
-from ..augmentations.composition import Compose, OneOf
-from  ..augmentations import functional as F
+from augmentations.composition import Compose, OneOf
+from augmentations import functional as F
 from imgaug import augmenters as iaa
 
 def to_tuple(param, low=None):

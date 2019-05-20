@@ -8,11 +8,11 @@ import torch.nn.functional as F
 from torch import nn
 # torch.backends.cudnn.benchmark = True
 import tqdm
-from ..augmentations.tta import transforms as TTA
-from ..augmentations.transforms import ToTensor
+from augmentations.tta import transforms as TTA
+from augmentations.transforms import ToTensor
 
 
-from ..dataset.neural_dataset import SequentialDataset
+from dataset.neural_dataset import SequentialDataset
 from torch.utils.data.dataloader import DataLoader as PytorchDataLoader
 
 

@@ -9,6 +9,18 @@ import argparse
 import json
 import pandas as pd
 
+import glob, os
+
+def cleanup_mac_hidden_files(workdir):
+    for root, dirs, files in os.walk(workdir):
+        for file in files:
+            if file.endswith('.DS_Store') or file.startswith('__MACOSX'):
+                path = os.path.join(root, file)
+                print("Deleting: %s" % (path))
+                if os.remove(path):
+                    print("Unable to delete!")
+                else:
+                    print("Deleted...")
 
 def get_folds(data, num):
     kf = KFold(n_splits=num, shuffle=True, random_state=42)

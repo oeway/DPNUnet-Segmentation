@@ -2,6 +2,8 @@ from collections import namedtuple
 
 Config = namedtuple("Config", [
     "dataset_path",
+    "image_file_name",
+    "mask_file_name",
     "iter_size",
     "folder",
     "target_rows",

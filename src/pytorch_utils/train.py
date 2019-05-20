@@ -132,12 +132,12 @@ class Estimator:
         if training:
             loss.backward()
 
-        meter['loss'] += loss.data.cpu().numpy()[0]
-        meter['d_n'] += dice_body.data.cpu().numpy()[0] / iter_size
-        meter['d_b'] += dice_border.data.cpu().numpy()[0] / iter_size
-        meter['ce'] += ce.data.cpu().numpy()[0] / iter_size
-        meter['dr_n'] += dice_r_body.data.cpu().numpy()[0] / iter_size
-        meter['dr_b'] += dice_r_border.data.cpu().numpy()[0] / iter_size
+        meter['loss'] += loss.data.cpu().numpy()
+        meter['d_n'] += dice_body.data.cpu().numpy() / iter_size
+        meter['d_b'] += dice_border.data.cpu().numpy() / iter_size
+        meter['ce'] += ce.data.cpu().numpy() / iter_size
+        meter['dr_n'] += dice_r_body.data.cpu().numpy() / iter_size
+        meter['dr_b'] += dice_r_border.data.cpu().numpy() / iter_size
         return meter
 
     def calculate_loss_sigmoid(self, output, target, meter, training, iter_size):

@@ -3,37 +3,39 @@ import os
 import cv2
 from scipy.misc import imread
 import numpy as np
+import random
 
-from .utils import get_csv_folds, update_config, get_folds
-from .config import Config
-from .dataset.reading_image_provider import ReadingImageProvider, CachingImageProvider, InFolderImageProvider
-from .dataset.raw_image import RawImageType
-from .pytorch_utils.concrete_eval import FullImageEvaluator
-from .augmentations.transforms import aug_victor
-from .pytorch_utils.train import train
-from .merge_preds import merge_files
+from utils import get_csv_folds, update_config, get_folds, cleanup_mac_hidden_files
+from config import Config
+from dataset.reading_image_provider import ReadingImageProvider, CachingImageProvider, InFolderImageProvider
+from dataset.raw_image import RawImageType
+from pytorch_utils.concrete_eval import FullImageEvaluator
+from augmentations.transforms import aug_victor
+from pytorch_utils.train import train
+from merge_preds import merge_files
 import json
 
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('config_path')
-parser.add_argument('--fold', type=int)
+parser.add_argument('--fold', type=int, default=0)
 parser.add_argument('--training', action='store_true')
 args = parser.parse_args()
 with open(args.config_path, 'r') as f:
     cfg = json.load(f)
-    cfg['dataset_path'] = cfg['dataset_path'] + ('' if args.training else '_test')
+    cfg['dataset_path'] = cfg['dataset_path'] + ('/train' if args.training else '/test')
 config = Config(**cfg)
 
 paths = {
-    'masks': 'mask.png',
-    'images': 'nuclei.png',
+    'masks': '',
+    'images': '',
     'labels': '',
 }
 
 fn_mapping = {
-    'masks': lambda name: name,
-    'labels': lambda name: os.path.splitext(name)[0] + '.tif'
+    'masks': lambda name: '{}/{}'.format(name, config.mask_file_name),
+    'images': lambda name: '{}/{}'.format(name, config.image_file_name),
+    'labels': lambda name: name
 }
 
 
@@ -83,33 +85,39 @@ class PaddedSigmoidImageType(SigmoidBorderImageType):
         return cv2.copyMakeBorder(data, 0, (32-rows%32), 0, (32-cols%32), cv2.BORDER_REFLECT)
 
 
-def train_bowl(train_idx, val_idx):
+def train_bowl():
+    global config
     torch.backends.cudnn.benchmark = True
+    cleanup_mac_hidden_files(config.dataset_path)
+    sample_count = len(os.listdir(config.dataset_path))
+    idx = list(range(sample_count))
+    random.seed(1)
+    random.shuffle(idx)
+    split = 0.95
+    train_idx, val_idx = idx[:int(split*sample_count)], idx[int(split*sample_count):] 
     im_type = BorderImageType if not config.sigmoid else SigmoidBorderImageType
     im_val_type = PaddedImageType if not config.sigmoid else PaddedSigmoidImageType
     ds = CachingImageProvider(im_type, paths, fn_mapping)
     val_ds = CachingImageProvider(im_val_type, paths, fn_mapping)
-    fold = 1 , 
+    fold = args.fold
     train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=num_workers, transforms=aug_victor(.97))
 
 
-def eval_bowl(val_indexes):
+def eval_bowl():
     global config
     test = not args.training
+    cleanup_mac_hidden_files(config.dataset_path)
+    sample_count = len(os.listdir(config.dataset_path))
+    val_indexes = list(range(sample_count))
     im_val_type = PaddedImageType if not config.sigmoid else PaddedSigmoidImageType
     im_prov_type = InFolderImageProvider if test else ReadingImageProvider
     ds = im_prov_type(im_val_type, paths, fn_mapping)
     keval = FullImageEvaluator(config, ds, test=test, flips=3, num_workers=num_workers, border=0)
-    fold = 1 
-    if args.fold is not None and int(args.fold) != fold:
-        continue
+    fold = args.fold
     keval.predict(fold, val_indexes)
     if test and args.fold is None:
         merge_files(keval.save_dir)
 
 if __name__ == "__main__":
-    train_bowl(
-        ['0a7d30b252359a10fd298b638b90cb9ada3acced4e0c0e5a3692013f432ee4e9', '0acd2c223d300ea55d0546797713851e818e5c697d073b7f4091b96ce0f3d2fe'],
-        ['00ae65c1c6631ae6f2be1a449902976e6eb8483bf6b0740d00530220832c6d3e', '0b0d577159f0d6c266f360f7b8dfde46e16fa665138bf577ec3c6f9c70c0cd1e']
-    )
+    train_bowl()
 
