@@ -190,12 +190,12 @@ class ImJoyPlugin():
         self.dialog = None
     async def run(self, ctx):
         self.dialog = await api.showDialog(type='launchpad', data= [
-                {'name': 'Annotate images', 'description': 'Start annotation on images.', 'callback': self.start_annotation, 'img': 'https://img.icons8.com/color/96/000000/double-right.png'},
-                 {'name': 'Generate masks', 'description': 'Generate masks for annotations.', 'callback': self.generate_masks, 'img': 'https://img.icons8.com/color/96/000000/opened-folder.png'},
-                {'name': 'Train with data from the engine', 'description': 'Use training data stored on a (local or remote) plugin engine.', 'callback': self.train, 'img': 'https://img.icons8.com/color/96/000000/opened-folder.png'},
-                {'name': 'Predict', 'description': 'Perform denoising on new images.', 'callback': self.predict, 'img': 'https://img.icons8.com/color/96/000000/double-right.png'},
+                {'name': 'Annotate images', 'description': 'Start annotation of images.', 'callback': self.start_annotation, 'img': 'https://img.icons8.com/color/96/000000/edit.png'},
+                {'name': 'Generate masks', 'description': 'Generate masks from annotations for training.', 'callback': self.generate_masks, 'img': 'https://img.icons8.com/color/96/000000/metamorphose.png'},
+                {'name': 'Train with data from the engine', 'description': 'Use training data stored on a (local or remote) plugin engine.', 'callback': self.train, 'img': 'https://img.icons8.com/color/96/000000/services.png'},
+                {'name': 'Predict', 'description': 'Segment nuclei in images.', 'callback': self.predict, 'img': 'https://img.icons8.com/color/96/000000/double-right.png'},
                 {'name': 'Documentation', 'description': 'Show documentation.', 'callback': self.show_docs, 'img': 'https://img.icons8.com/color/96/000000/help.png'},
-            ]
+             ]
         )
 
     async def show_docs(self):
