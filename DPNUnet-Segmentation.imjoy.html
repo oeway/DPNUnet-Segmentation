@@ -18,7 +18,7 @@
   "api_version": "0.1.5",
   "env": "conda create -n dsb2018 python=3.6.8",
   "requirements": ["pip: descartes palettable geojson read-roi gputil namedlist", "pip: lightgbm imgaug scipy==1.0.0 pandas", "conda: opencv tqdm", "conda: pytorch=0.4.1 cuda90 -c pytorch", "pip: torchvision tensorboardX", "repo: https://github.com/oeway/DPNUnet-Segmentation"],
-  "dependencies": ["oeway/ImJoy-Plugins:Im2Im-Dashboard", "https://gist.githubusercontent.com/oeway/9f3866424835d94f05f857178e21603d/raw/ImageAnnotator.imjoy.html", "https://gist.githubusercontent.com/oeway/961c8d7abe24383d3ad6312669fe1d7c/raw/launchpad.imjoy.html"]
+  "dependencies": ["oeway/ImJoy-Plugins:Im2Im-Dashboard", "https://raw.githubusercontent.com/oeway/DPNUnet-Segmentation/master/DPNUnet-Segmentation-docs.imjoy.html", "https://gist.githubusercontent.com/oeway/9f3866424835d94f05f857178e21603d/raw/ImageAnnotator.imjoy.html", "https://gist.githubusercontent.com/oeway/961c8d7abe24383d3ad6312669fe1d7c/raw/launchpad.imjoy.html"]
 }
 </config>
 
@@ -138,7 +138,7 @@ def train_bowl(dash, config, paths, fn_mapping):
     random.seed(1)
     random.shuffle(idx)
     split = 0.95
-    train_idx, val_idx = idx[:int(split*sample_count)], idx[int(split*sample_count):] 
+    train_idx, val_idx = idx[:int(split*sample_count)], idx[int(split*sample_count):]
     im_type = BorderImageType if not config.sigmoid else SigmoidBorderImageType
     im_val_type = PaddedImageType if not config.sigmoid else PaddedSigmoidImageType
     ds = CachingImageProvider(im_type, paths, fn_mapping)
@@ -201,17 +201,25 @@ class ImJoyPlugin():
     async def show_docs(self):
         if self.dialog is not None:
             self.dialog.close()
-        api.alert('Not implemented')
+        try:
+            await this.win_docs.run({'data': {}})
+        except:
+            this.win_docs = await api.createWindow({
+                    'name': 'Documentation - DPNUnet',
+                    'type': 'DPNUnet-Segmentation-docs',
+                    'w':30, 'h':20,
+                    'data': {}
+                    })
 
     async def predict(self):
         if self.dialog is not None:
             self.dialog.close()
-    
+
         options = await api.showDialog( name="Prediction Configurations", ui= "<br>".join([
         "Image file name { id: 'image_file_name', type:'string', placeholder: 'nuclei.png'}",
         "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_weighted_boarder.png'}",
         ]))
-       
+
         config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', True)
         ret = await api.showFileDialog(title="Please select a folder containing your testing data ( folder with a subfolder called `test`).", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
         config.dataset_path = ret.path
@@ -220,7 +228,7 @@ class ImJoyPlugin():
         config.epoch_size = 24
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name=" DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
         await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping)
-        
+
 
         await api.showStatus('Start post-processing...')
         def callback(result):
@@ -230,12 +238,12 @@ class ImJoyPlugin():
             if step %10 == 0:
                 api.showProgress(step/total*100)
                 api.showStatus(f'Processing {step}/{total}: {name}')
-        
+
         postprocessing(config.dataset_path, callback)
-        
+
         await api.showProgress(100)
         api.alert(f'Prediction done, generated masks saved to {config.dataset_path}')
-        
+
 
     async def train(self):
         if self.dialog is not None:
@@ -246,7 +254,7 @@ class ImJoyPlugin():
         "Image file name { id: 'image_file_name', type:'string', placeholder: 'nuclei.png'}",
         "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_weighted_boarder.png'}",
         ]))
-       
+
         config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax.json', True)
         ret = await api.showFileDialog(title="Please select a folder containing the training and testing data as subfolders ‘train’ and ‘test.", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
         config.dataset_path = ret.path
@@ -259,7 +267,7 @@ class ImJoyPlugin():
         api.log(f'model will be saved to {save_path}')
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Training DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
         await loop.run_in_executor(None, train_bowl, self.dash, config, paths, fn_mapping)
-        
+
         api.alert(f'Training finished, model saved to {save_path}')
 
     async def generate_masks(self):
