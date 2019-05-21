@@ -10,11 +10,12 @@ from .eval import Evaluator
 
 class FullImageEvaluator(Evaluator):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         if 'step_callback' in kwargs:
             self.step_callback = kwargs['step_callback']
+            del kwargs['step_callback']
         else:
             self.step_callback = None
+        super().__init__(*args, **kwargs)
 
     def process_batch(self, predicted, model, data, prefix=""):
         names = data['image_name']
