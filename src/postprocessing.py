@@ -124,7 +124,9 @@ im_names = os.listdir(test_dir)
 test_ids = [os.path.splitext(i)[0] for i in im_names]
 preds_test = [imread(os.path.join(test_dir, im, 'nuclei_weighted_boarder.png'), mode='RGB') for im in im_names]
 for n, id_ in enumerate(test_ids):
+    print(os.path.join(test_dir, im_names[n], 'nuclei_weighted_boarder_masks.png'))
     test_img = wsh(preds_test[n][...,2] / 255., 0.3, 1 - preds_test[n][...,1] / 255., preds_test[n][...,2] / 255)
-    cv2.imwrite(os.path.join(os.path.join(test_dir, im, 'nuclei_weighted_boarder_masks.png'), im_names[n]), (test_img > 0).astype(np.uint8) * 255)
+    cv2.imwrite(os.path.join(test_dir, im_names[n], 'nuclei_weighted_boarder_masks.png'), (test_img > 0).astype(np.uint8) * 255)
 
-
+    test_img2 = postprocess_victor(preds_test[n])
+    cv2.imwrite(os.path.join(test_dir, im_names[n], 'nuclei_weighted_boarder_masks_victor.png'), (test_img > 0).astype(np.uint8) * 255)
