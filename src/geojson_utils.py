@@ -40,7 +40,7 @@ def masks_to_annotation(datasets_dir, save_path):
 
 
 
-def gen_mask_from_geojson(files_proc, masks_to_create_value=['filled', 'edge', 'distance', 'weigthed', 'weighted_boarder'], img_size=None, infer=False):
+def gen_mask_from_geojson(files_proc, masks_to_create_value=['filled', 'edge', 'distance', 'weigthed', 'border_mask'], img_size=None, infer=False):
     masks_to_create = {}
 
     # annot_types = list(masks_to_create.keys())
@@ -52,7 +52,7 @@ def gen_mask_from_geojson(files_proc, masks_to_create_value=['filled', 'edge', '
 
     weightedEdgeMasks = annotationUtils.WeightedEdgeMaskGenerator(sigma=8, w0=10)
     distMapMasks = annotationUtils.DistanceMapGenerator(truncate_distance=None)
-    weightedBoarderMasks = annotationUtils.WeightedBoarderGenerator()
+    borderMasks = annotationUtils.borderMaskGenerator()
 
     # %% Loop over all files
     for i, file_proc in enumerate(files_proc):
@@ -138,17 +138,17 @@ def gen_mask_from_geojson(files_proc, masks_to_create_value=['filled', 'edge', '
                 masks.save(mask_dict,'edge_weighted',file_name_save)
 
 
-            # Weighted boarder mask
-            if 'weighted_boarder' in masks_to_create[annot_type]:
+            # border_mask
+            if 'border_mask' in masks_to_create[annot_type]:
                 print(' .... creating weighted boarder masks .....')
-                mask_dict = weightedBoarderMasks.generate(annot_dict,mask_dict)
+                mask_dict = borderMasks.generate(annot_dict,mask_dict)
 
                 # Save
                 if infer:
-                    file_name_save = os.path.join(drive,path, annot_type + '_weighted_boarder_output.png')
+                    file_name_save = os.path.join(drive,path, annot_type + '_border_mask_output.png')
                 else:
-                    file_name_save = os.path.join(drive,path, annot_type + '_weighted_boarder.png')
-                cv2.imwrite(file_name_save, mask_dict['weighted_boarder'],
+                    file_name_save = os.path.join(drive,path, annot_type + '_border_mask.png')
+                cv2.imwrite(file_name_save, mask_dict['border_mask'],
                             [cv2.IMWRITE_PNG_COMPRESSION, 9])
 
 
