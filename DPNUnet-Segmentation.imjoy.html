@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet-Segmentation",
   "type": "native-python",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": [],
   "ui": "",
@@ -17,8 +17,8 @@
   "icon": "extension",
   "api_version": "0.1.5",
   "env": "conda create -n dsb2018 python=3.6.8",
-  "requirements": ["pip: descartes palettable geojson read-roi gputil", "pip: lightgbm imgaug scipy==1.0.0 pandas", "conda: opencv tqdm", "conda: pytorch=0.4.1 cuda90 -c pytorch", "pip: torchvision tensorboardX", "repo: https://github.com/oeway/DPNUnet-Segmentation"],
-  "dependencies": ["oeway/ImJoy-Plugins:Im2Im-Dashboard"]
+  "requirements": ["pip: descartes palettable geojson read-roi gputil namedlist", "pip: lightgbm imgaug scipy==1.0.0 pandas", "conda: opencv tqdm", "conda: pytorch=0.4.1 cuda90 -c pytorch", "pip: torchvision tensorboardX", "repo: https://github.com/oeway/DPNUnet-Segmentation"],
+  "dependencies": ["oeway/ImJoy-Plugins:Im2Im-Dashboard", "https://gist.githubusercontent.com/oeway/9f3866424835d94f05f857178e21603d/raw/ImageAnnotator.imjoy.html", "https://gist.githubusercontent.com/oeway/961c8d7abe24383d3ad6312669fe1d7c/raw/launchpad.imjoy.html"]
 }
 </config>
 
@@ -63,6 +63,11 @@ from merge_preds import merge_files
 import json
 
 import argparse
+
+if os.path.exists('/imjoy/imjoy-paper'):
+    ROOT_DIR = '/imjoy/imjoy-paper'
+else:
+    ROOT_DIR = ''
 
 
 loop = asyncio.get_event_loop()
@@ -120,8 +125,7 @@ def load_config(config_path, training):
     return config, paths, fn_mapping
 
 
-def train_bowl(dash, epochs):
-    config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax.json', True)
+def train_bowl(dash, config, paths, fn_mapping):
     asyncio.set_event_loop(loop)
     dash.setLoading({'status_text': 'Loading data...', 'loading': True})
     torch.backends.cudnn.benchmark = True
@@ -139,12 +143,13 @@ def train_bowl(dash, epochs):
     fold = 0
     api.showStatus('start training ...')
     dash.setLoading({'status_text': 'Start training...', 'loading': True})
-    updateUI = UpdateUI(epochs, dash)
+    updateUI = UpdateUI(config.nb_epoch, dash)
     num_workers = 0 if os.name == 'nt' else 4
     train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=num_workers, callbacks=[updateUI], transforms=aug_victor(.97))
 
 
-def eval_bowl():
+def eval_bowl(dash, config, paths, fn_mapping):
+    asyncio.set_event_loop(loop)
     config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', False)
     test = True
     cleanup_mac_hidden_files(config.dataset_path)
@@ -154,34 +159,99 @@ def eval_bowl():
     im_prov_type = InFolderImageProvider if test else ReadingImageProvider
     ds = im_prov_type(im_val_type, paths, fn_mapping)
     num_workers = 0 if os.name == 'nt' else 4
-    keval = FullImageEvaluator(config, ds, test=test, flips=3, num_workers=num_workers, border=0)
+    api.showStatus('start prediction ...')
+    dash.setLoading({'status_text': 'Start Prediction...', 'loading': True})
+    def step_callback(result_dict):
+        dash.setLoading({'status_text': 'Start prediction: ' + result_dict['name'], 'loading': True})
+        api.log('result saved to ' + result_dict['save_path'])
+    keval = FullImageEvaluator(config, ds, test=test, flips=3, step_callback=step_callback,  num_workers=num_workers, border=0)
     fold =  0
     keval.predict(fold, val_indexes)
     merge_files(keval.save_dir)
 
 
 class ImJoyPlugin():
+    def __init__(self):
+        self.dialog = None
     async def run(self, ctx):
-        config = await api.showDialog( name="Training Configurations", ui= "<br>".join([
+        self.dialog = await api.showDialog(type='launchpad', data= [
+                {'name': 'Annotate images', 'description': 'Start annotation on images.', 'callback': self.start_annotation, 'img': 'https://img.icons8.com/color/96/000000/double-right.png'},
+                 {'name': 'Generate masks', 'description': 'Generate masks for annotations.', 'callback': self.generate_masks, 'img': 'https://img.icons8.com/color/96/000000/opened-folder.png'},
+                {'name': 'Train with data from the engine', 'description': 'Use training data stored on a (local or remote) plugin engine.', 'callback': self.train, 'img': 'https://img.icons8.com/color/96/000000/opened-folder.png'},
+                {'name': 'Predict', 'description': 'Perform denoising on new images.', 'callback': self.predict, 'img': 'https://img.icons8.com/color/96/000000/double-right.png'},
+                {'name': 'Documentation', 'description': 'Show documentation.', 'callback': self.show_docs, 'img': 'https://img.icons8.com/color/96/000000/help.png'},
+            ]
+        )
+
+    async def show_docs(self):
+        if self.dialog is not None:
+            self.dialog.close()
+        api.alert('Not implemented')
+
+    async def predict(self):
+        if self.dialog is not None:
+            self.dialog.close()
+    
+        options = await api.showDialog( name="Prediction Configurations", ui= "<br>".join([
+        "Image file name { id: 'image_file_name', type:'string', placeholder: 'nuclei.png'}",
+        "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_weighted_boarder.png'}",
+        ]))
+       
+        config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', True)
+        ret = await api.showFileDialog(title="Please select a folder containing your testing data ( folder with a subfolder called `test`).", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
+        config.dataset_path = ret.path
+        config.results_dir = os.path.join(config.dataset_path, 'results')
+        config.batch_size = 16
+        config.epoch_size = 24
+        self.dash = await api.createWindow(type="Im2Im-Dashboard", name=" DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
+        await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping)
+        api.alert('Prediction done.')
+
+
+    async def train(self):
+        if self.dialog is not None:
+            self.dialog.close()
+        options = await api.showDialog( name="Training Configurations", ui= "<br>".join([
         "Model Name {id: 'model_name', type: 'string', placeholder: 'dpnunet-model-1'}",
         "Epochs { id: 'epochs', type:'number', placeholder: 30}",
         "Image file name { id: 'image_file_name', type:'string', placeholder: 'nuclei.png'}",
         "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_weighted_boarder.png'}",
         ]))
-
+       
+        config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax.json', True)
+        ret = await api.showFileDialog(title="Please select a folder containing the training and testing data as subfolders ‘train’ and ‘test.", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
+        config.dataset_path = ret.path
+        config.results_dir = os.path.join(config.dataset_path, 'results')
+        config.nb_epoch = options.epochs
+        config.batch_size = 16
+        config.epoch_size = 24
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Training DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
-        await loop.run_in_executor(None, train_bowl, self.dash, config.epochs)
+        await loop.run_in_executor(None, train_bowl, self.dash, config, paths, fn_mapping)
+        api.alert('Training finished')
 
     async def generate_masks(self):
-        data_dialog = await api.showFileDialog(root=os.getcwd(), type="directory")
+        if self.dialog is not None:
+            self.dialog.close()
+        data_dialog = await api.showFileDialog(root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type="directory")
         datasets_dir = data_dialog.get("path")
         print("datasets_dir:", datasets_dir)
-        for file_id in os.listdir(os.path.join(datasets_dir, "train")):
+        file_ids = os.listdir(os.path.join(datasets_dir, "train"))
+        total = len(file_ids)
+        for i, file_id in enumerate(file_ids):
+            api.showProgress(i/total*100)
+            api.showStatus(f'Processing {i}/{total}: {file_id}')
             file_path = os.path.join(datasets_dir, "train", file_id, "annotation.json")
             try:
                 gen_mask_from_geojson([file_path], masks_to_create_value=["weighted_boarder"])
             except:
                 print("generate mask error:", os.path.join(datasets_dir, "train", file_id))
+        api.showProgress(100)
+        api.alert('Finished.')
+
+    async def start_annotation(self):
+        if self.dialog is not None:
+            self.dialog.close()
+        await api.createWindow(name="Annotation for DPNUnet", fullscreen=True, type="ImageAnnotator", data={}, config={})
 
     def setup(self):
         api.log('initialized')
