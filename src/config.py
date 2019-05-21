@@ -1,6 +1,6 @@
-from collections import namedtuple
+from namedlist import namedlist
 
-Config = namedtuple("Config", [
+Config = namedlist("Config", [
     "dataset_path",
     "image_file_name",
     "mask_file_name",
