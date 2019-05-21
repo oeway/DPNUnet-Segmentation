@@ -40,7 +40,7 @@ class FullImageEvaluator(Evaluator):
 
         do_save = True
         if self.step_callback is not None:
-            skip_save = self.step_callback({'prediction': prediction, 'save_path': save_path})
+            skip_save = self.step_callback({'prediction': prediction, 'save_path': save_path, 'name': name})
             if skip_save:
                 do_save = False
 
