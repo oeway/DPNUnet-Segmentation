@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet-Segmentation",
   "type": "native-python",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": [],
   "ui": "",
@@ -229,15 +229,21 @@ class ImJoyPlugin():
     async def generate_masks(self):
         if self.dialog is not None:
             self.dialog.close()
-        data_dialog = await api.showFileDialog(root=os.getcwd(), type="directory")
+        data_dialog = await api.showFileDialog(root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type="directory")
         datasets_dir = data_dialog.get("path")
         print("datasets_dir:", datasets_dir)
-        for file_id in os.listdir(os.path.join(datasets_dir, "train")):
+        file_ids = os.listdir(os.path.join(datasets_dir, "train"))
+        total = len(file_ids)
+        for i, file_id in enumerate(file_ids):
+            api.showProgress(i/total*100)
+            api.showStatus(f'Processing {i}/{total}: {file_id}')
             file_path = os.path.join(datasets_dir, "train", file_id, "annotation.json")
             try:
                 gen_mask_from_geojson([file_path], masks_to_create_value=["weighted_boarder"])
             except:
                 print("generate mask error:", os.path.join(datasets_dir, "train", file_id))
+        api.showProgress(100)
+        api.alert('Finished.')
 
     def setup(self):
         api.log('initialized')
