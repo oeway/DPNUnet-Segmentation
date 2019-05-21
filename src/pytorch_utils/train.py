@@ -234,7 +234,6 @@ class MetricsCollection:
         self.train_metrics = {}
         self.val_metrics = {}
 
-
 class PytorchTrain:
     def __init__(self, estimator: Estimator, fold, callbacks=None, hard_negative_miner=None):
         self.fold = fold
@@ -246,6 +245,7 @@ class PytorchTrain:
 
         self.hard_negative_miner = hard_negative_miner
         self.metrics_collection = MetricsCollection()
+        self.current_results = {}
 
         self.estimator.resume("fold" + str(fold) + "_checkpoint.pth")
         # if self.estimator.model_changed:
@@ -273,15 +273,18 @@ class PytorchTrain:
                         self.hard_negative_miner.invalidate_cache()
 
             pbar.set_postfix(**{k: "{:.5f}".format(v / (i + 1)) for k, v in avg_meter.items()})
-
+            
             self.callbacks.on_batch_end(i)
-        return {k: v / len(loader) for k, v in avg_meter.items()}
+
+        # store results from last batch
+        return {k: v / len(loader) for k, v in avg_meter.items()}.update(results)
 
     def _make_step(self, data, training):
         images = data['image']
         ytrues = data['mask']
 
         meter, ypreds = self.estimator.make_step_itersize(images, ytrues, training)
+        self.current_results =  {'inputs': images, 'outputs': ypreds, 'target': ytrues}
 
         return meter, ypreds
 
@@ -307,7 +310,7 @@ class PytorchTrain:
         self.callbacks.on_train_end()
 
 
-def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transforms=None, val_transforms=None, num_channels_changed=False, final_changed=False, cycle=False):
+def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transforms=None, val_transforms=None, num_channels_changed=False, final_changed=False, cycle=False, callbacks=[]):
     os.makedirs(os.path.join('..', 'weights'), exist_ok=True)
     os.makedirs(os.path.join('..', 'logs'), exist_ok=True)
 
@@ -317,7 +320,7 @@ def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transform
                           config=config, num_channels_changed=num_channels_changed, final_changed=final_changed)
 
     estimator.lr_scheduler = ExponentialLR(estimator.optimizer, config.lr_gamma)#LRStepScheduler(estimator.optimizer, config.lr_steps)
-    callbacks = [
+    callbacks = callbacks + [
         ModelSaver(1, ("fold"+str(fold)+"_best.pth"), best_only=True),
         ModelSaver(1, ("fold"+str(fold)+"_last.pth"), best_only=False),
         CheckpointSaver(1, ("fold"+str(fold)+"_checkpoint.pth")),
