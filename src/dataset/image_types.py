@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import cv2
 from scipy.misc import imread
 from dataset.raw_image import RawImageType
