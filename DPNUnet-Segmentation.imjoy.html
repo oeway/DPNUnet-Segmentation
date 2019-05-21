@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet-Segmentation",
   "type": "native-python",
-  "version": "0.1.4",
+  "version": "0.1.6",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": [],
   "ui": "",
@@ -24,9 +24,10 @@
 
 <script lang="python">
 import os
-os.chdir('/imjoy/imjoy-paper/data-science-bowl/DPNUnet-segmentation-imjoy/src') #'DPNUnet-Segmentation/src')
-
-
+if os.path.exists('/imjoy/imjoy-paper/data-science-bowl/DPNUnet-segmentation-imjoy/src'):
+    os.chdir('/imjoy/imjoy-paper/data-science-bowl/DPNUnet-segmentation-imjoy/src')
+else:
+    os.chdir('DPNUnet-Segmentation/src')
 
 import GPUtil
 # Set CUDA_DEVICE_ORDER so the IDs assigned by CUDA match those from nvidia-smi
@@ -45,7 +46,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = str(DEVICE_ID)
 import asyncio
 from imjoy import api
 from geojson_utils import masks_to_annotation, gen_mask_from_geojson
-
+from postprocessing import wsh
 import torch
 import os
 import numpy as np
@@ -61,6 +62,8 @@ from augmentations.transforms import aug_victor
 from pytorch_utils.train import train
 from merge_preds import merge_files
 import json
+import cv2
+from scipy.misc import imread
 
 import argparse
 
@@ -170,6 +173,18 @@ def eval_bowl(dash, config, paths, fn_mapping):
     merge_files(keval.save_dir)
 
 
+def postprocessing(test_dir, step_callback):
+    im_names = os.listdir(test_dir)
+    test_ids = [os.path.splitext(i)[0] for i in im_names]
+    total = len(test_ids)
+    preds_test = [imread(os.path.join(test_dir, im, 'nuclei_weighted_boarder_output.png'), mode='RGB') for im in im_names]
+    for n, id_ in enumerate(test_ids):
+        print(os.path.join(test_dir, im_names[n], 'nuclei_weighted_boarder_output_watershed.png'))
+        test_img = wsh(preds_test[n][...,2] / 255., 0.3, 1 - preds_test[n][...,1] / 255., preds_test[n][...,2] / 255)
+        cv2.imwrite(os.path.join(test_dir, im_names[n], 'nuclei_weighted_boarder_output_watershed.png'), (test_img > 0).astype(np.uint8) * 255)
+        if step_callback:
+            step_callback({'name': id_, 'step': n, 'total': total})
+
 class ImJoyPlugin():
     def __init__(self):
         self.dialog = None
@@ -205,8 +220,22 @@ class ImJoyPlugin():
         config.epoch_size = 24
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name=" DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
         await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping)
-        api.alert('Prediction done.')
+        
 
+        await api.showStatus('Start post-processing...')
+        def callback(result):
+            step = result['step']
+            total = result['total']
+            name = result['name']
+            if step %10 == 0:
+                api.showProgress(step/total*100)
+                api.showStatus(f'Processing {step}/{total}: {name}')
+        
+        postprocessing(config.dataset_path, callback)
+        
+        await api.showProgress(100)
+        api.alert(f'Prediction done, generated masks saved to {config.dataset_path}')
+        
 
     async def train(self):
         if self.dialog is not None:
@@ -225,28 +254,33 @@ class ImJoyPlugin():
         config.nb_epoch = options.epochs
         config.batch_size = 16
         config.epoch_size = 24
+
+        save_path = os.path.join('..', 'weights', config.folder)
+        api.log(f'model will be saved to {save_path}')
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Training DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
         await loop.run_in_executor(None, train_bowl, self.dash, config, paths, fn_mapping)
-        api.alert('Training finished')
+        
+        api.alert(f'Training finished, model saved to {save_path}')
 
     async def generate_masks(self):
         if self.dialog is not None:
             self.dialog.close()
-        data_dialog = await api.showFileDialog(root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type="directory")
-        datasets_dir = data_dialog.get("path")
+        ret = await api.showFileDialog(root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type="directory")
+        datasets_dir = ret.path
         print("datasets_dir:", datasets_dir)
         file_ids = os.listdir(os.path.join(datasets_dir, "train"))
         total = len(file_ids)
         for i, file_id in enumerate(file_ids):
-            api.showProgress(i/total*100)
-            api.showStatus(f'Processing {i}/{total}: {file_id}')
+            await api.showProgress(i/total*100)
+            await api.showStatus(f'Processing {i}/{total}: {file_id}')
             file_path = os.path.join(datasets_dir, "train", file_id, "annotation.json")
             try:
                 gen_mask_from_geojson([file_path], masks_to_create_value=["weighted_boarder"])
             except:
                 print("generate mask error:", os.path.join(datasets_dir, "train", file_id))
-        api.showProgress(100)
-        api.alert('Finished.')
+        await api.showProgress(100)
+        await api.alert('Finished, generated masks saved to ' + datasets_dir)
+
 
     async def start_annotation(self):
         if self.dialog is not None:
