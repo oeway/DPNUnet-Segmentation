@@ -264,20 +264,22 @@ class PytorchTrain:
             meter, ypreds = self._make_step(data, training)
             for k, val in meter.items():
                 avg_meter[k] += val
-
+            
             if training:
+                self.metrics_collection.train_metrics = meter
                 if self.hard_negative_miner is not None:
                     self.hard_negative_miner.update_cache(meter, data)
                     if self.hard_negative_miner.need_iter():
                         self._make_step(self.hard_negative_miner.cache, training)
                         self.hard_negative_miner.invalidate_cache()
+            else:
+                self.metrics_collection.val_metrics = meter
 
             pbar.set_postfix(**{k: "{:.5f}".format(v / (i + 1)) for k, v in avg_meter.items()})
             
             self.callbacks.on_batch_end(i)
 
-        # store results from last batch
-        return {k: v / len(loader) for k, v in avg_meter.items()}.update(results)
+        return {k: v / len(loader) for k, v in avg_meter.items()}
 
     def _make_step(self, data, training):
         images = data['image']
