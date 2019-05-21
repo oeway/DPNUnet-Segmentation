@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet-Segmentation",
   "type": "native-python",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": [],
   "ui": "",
@@ -18,7 +18,7 @@
   "api_version": "0.1.5",
   "env": "conda create -n dsb2018 python=3.6.8",
   "requirements": ["pip: descartes palettable geojson read-roi gputil namedlist", "pip: lightgbm imgaug scipy==1.0.0 pandas", "conda: opencv tqdm", "conda: pytorch=0.4.1 cuda90 -c pytorch", "pip: torchvision tensorboardX", "repo: https://github.com/oeway/DPNUnet-Segmentation"],
-  "dependencies": ["oeway/ImJoy-Plugins:Im2Im-Dashboard", "https://gist.githubusercontent.com/oeway/961c8d7abe24383d3ad6312669fe1d7c/raw/launchpad.imjoy.html"]
+  "dependencies": ["oeway/ImJoy-Plugins:Im2Im-Dashboard", "https://gist.githubusercontent.com/oeway/9f3866424835d94f05f857178e21603d/raw/ImageAnnotator.imjoy.html", "https://gist.githubusercontent.com/oeway/961c8d7abe24383d3ad6312669fe1d7c/raw/launchpad.imjoy.html"]
 }
 </config>
 
@@ -175,6 +175,7 @@ class ImJoyPlugin():
         self.dialog = None
     async def run(self, ctx):
         self.dialog = await api.showDialog(type='launchpad', data= [
+                {'name': 'Annotate images', 'description': 'Start annotation on images.', 'callback': self.start_annotation, 'img': 'https://img.icons8.com/color/96/000000/double-right.png'},
                  {'name': 'Generate masks', 'description': 'Generate masks for annotations.', 'callback': self.generate_masks, 'img': 'https://img.icons8.com/color/96/000000/opened-folder.png'},
                 {'name': 'Train with data from the engine', 'description': 'Use training data stored on a (local or remote) plugin engine.', 'callback': self.train, 'img': 'https://img.icons8.com/color/96/000000/opened-folder.png'},
                 {'name': 'Predict', 'description': 'Perform denoising on new images.', 'callback': self.predict, 'img': 'https://img.icons8.com/color/96/000000/double-right.png'},
@@ -244,6 +245,11 @@ class ImJoyPlugin():
                 print("generate mask error:", os.path.join(datasets_dir, "train", file_id))
         api.showProgress(100)
         api.alert('Finished.')
+
+    async def start_annotation(self):
+        if self.dialog is not None:
+            self.dialog.close()
+        await api.createWindow(name="Annotation for DPNUnet", fullscreen=True, type="ImageAnnotator", data={}, config={})
 
     def setup(self):
         api.log('initialized')
