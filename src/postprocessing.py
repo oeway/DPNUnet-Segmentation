@@ -72,14 +72,14 @@ def postprocess_victor(pred):
     y_pred = watershed(nucl_msk, y_pred, mask=((pred[..., 2] > 80)), watershed_line=True)
     return y_pred
 
-
-test_dir = '/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1/test'
-im_names = os.listdir(test_dir)
-test_ids = [os.path.splitext(i)[0] for i in im_names]
-preds_test = [imread(os.path.join(test_dir, im, 'nuclei_weighted_boarder_output.png'), mode='RGB') for im in im_names]
-for n, id_ in enumerate(test_ids):
-    print(os.path.join(test_dir, im_names[n], 'nuclei_weighted_boarder_output_watershed.png'))
-    test_img = wsh(preds_test[n][...,2] / 255., 0.3, 1 - preds_test[n][...,1] / 255., preds_test[n][...,2] / 255)
-    cv2.imwrite(os.path.join(test_dir, im_names[n], 'nuclei_weighted_boarder_output_watershed.png'), (test_img > 0).astype(np.uint8) * 255)
-    # test_img2 = postprocess_victor(preds_test[n])
-    # cv2.imwrite(os.path.join(test_dir, im_names[n], 'nuclei_weighted_boarder_output_watershed.png'), (test_img > 0).astype(np.uint8) * 255)
+if __name__ == "__main__":
+    test_dir = '/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1/test'
+    im_names = os.listdir(test_dir)
+    test_ids = [os.path.splitext(i)[0] for i in im_names]
+    preds_test = [imread(os.path.join(test_dir, im, 'nuclei_weighted_boarder_output.png'), mode='RGB') for im in im_names]
+    for n, id_ in enumerate(test_ids):
+        print(os.path.join(test_dir, im_names[n], 'nuclei_weighted_boarder_output_watershed.png'))
+        test_img = wsh(preds_test[n][...,2] / 255., 0.3, 1 - preds_test[n][...,1] / 255., preds_test[n][...,2] / 255)
+        cv2.imwrite(os.path.join(test_dir, im_names[n], 'nuclei_weighted_boarder_output_watershed.png'), (test_img > 0).astype(np.uint8) * 255)
+        # test_img2 = postprocess_victor(preds_test[n])
+        # cv2.imwrite(os.path.join(test_dir, im_names[n], 'nuclei_weighted_boarder_output_watershed.png'), (test_img > 0).astype(np.uint8) * 255)
