@@ -1,0 +1,373 @@
+﻿<docs lang="markdown">
+[TODO: write documentation for this plugin.]
+</docs>
+
+<config lang="json">
+{
+  "name": "DPNUnet-Segmentation-docs",
+  "type": "window",
+  "tags": [],
+  "ui": "",
+  "version": "0.1.0",
+  "cover": "",
+  "description": "Documentation for image segmentation.",
+  "icon": "extension",
+  "inputs": null,
+  "outputs": null,
+  "api_version": "0.1.5",
+  "env": "",
+  "requirements": [
+        "https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.10/vue.min.js",
+        "https://cdnjs.cloudflare.com/ajax/libs/marked/0.6.2/marked.js",
+        "https://static.imjoy.io/spectre.css/spectre.min.css",
+        "https://static.imjoy.io/spectre.css/spectre-exp.min.css",
+        "https://static.imjoy.io/spectre.css/spectre-icons.min.css"],
+  "dependencies": [],
+  "defaults": {"w": 30, "h": 20}
+}
+</config>
+
+
+<attachment name="summary">
+<br>
+<p id="segmentation-summary"> THis is the documentation for a complete framework to perform image segmentation with deep learning.
+</p>
+
+**ToDo: ADD screenshot of segmentation results**
+
+In this document we describe the plugins to perform all steps:
+
+* Annotation
+* Training including post-processing to obtain objects
+* Prediction
+
+**ToDo illustrate workflow**
+
+
+</attachment> 
+
+<attachment name="deeplearning">
+<br>
+<p id="deep-learning-primer">
+We provide only a quick overview what deep learning is and establish the necessary
+terminology to understand this segmentation workflow. For a more detailed introduction, 
+we refer to many available online ressources. 
+</p>
+
+<h2>What is deep learning</h2>
+Deep learning is a machine learning method that uses an input X to predict
+an output Y. This prediction is performed with Deep Neural Networks. 
+The essential building block of such a neural network is a perceptron 
+which accomplishes simple signal processing. These perceptrons are then 
+connected into a large mesh network. 
+Importantly, such a network has to be trained before prediction can be performed. 
+
+<img src="https://www.dropbox.com/s/hbg3c23gwfedu0p/neural_network.png?dl=1" class="img-responsive ..." alt="Neural network scheme.">
+   
+<h2>Train a neural network</h2>
+To train a neural network annotated data has to be provided, for instance a DAPI image 
+with outlined nuclei. These data are then used by the neural network to learn how
+to detect nuclei in new images. 
+
+The training is performed iteratively and progress is monitored with so-called loss functions. 
+These functions measure how well the method performs by comparing the input images to the 
+generated images by the neural network. The annotated data is split into 
+two data-sets: one for the **actual training**, one for **validation**. The validation data is not 
+used for training but to monitor how the model generalizes to new data.
+
+When monitoring training progress different distinct phases are usually observed: 
+initially the model can neither describe the training and validation data (**underfitting**). 
+Eventually the model will describe the training data too well and not generalize 
+anymore to new data (**overfitting**). Good training finds the sweet spot between these two 
+extreme cases. 
+
+<img src="https://www.dropbox.com/s/inlro9emd2yk1y6/training_validation.png?dl=1" class="img-responsive ..." alt="Neural network scheme.">
+  
+Training a neural network is **computationally expensive** and is best performed on 
+**GPUs** (Graphics Processing Unit) or computational clusters. Applying a trained model is less
+demanding and can be done on routinely on regular computers, and depending on the implementation
+even on mobile devices.  
+
+Applying a neural network to **new data** frequently requires **re-training**. Here, a already trained
+model is used as the starting point to perform training on the new data. 
+
+</attachment>
+
+<attachment name="data">
+<br>
+<p id="data-requirements">
+Here we describe how the training images have to be provided: image format, naming scheme, and data organization. 
+</p>
+
+<h2>Image formats</h2>
+**Segmentation in this workflow is performed on 2D images**. 3D images have to be converted to 2D, e.g. with 
+a maximum intensity projection. Images can be stored either as **png** or **tif** files.
+
+<h2>Data organization for training</h2>
+To perform training, you have to provide both the input images as well as the annotations.
+We described in a dedicated section how to create the later. 
+
+These data have to be organised
+according to following guidelines, resulting in an organisation as shown below.
+1. Data has to be stored in two folders **train**, **valid**. 
+The `train` folder will be used to train the neural network, the `valid` folder
+to continuously monitor how well the training worked.
+2. Each sample (for instance a field of view) is stored in a separate subfolder
+3. File names for different channels have to be identical across subfolders, i.e. a 
+   a DAPI image is always called `nuclei.tif`.
+```
+
+├─ data_for_training/
+│  ├─ train/
+│  │  ├─ img1
+│  │  │  ├─ annotation.json
+│  │  │  ├─ cells.tif
+│  │  │  ├─ nuclei.tif
+│  │  ├─ img2
+│  │  │  ├─ annotation.json
+│  │  │  ├─ cells.tif
+│  │  │  ├─ nuclei.tif
+│  │  ...
+│  ├─ valid/
+│  │  ├─ img57
+│  │  │  ├─ annotation.json
+│  │  │  ├─ cells.tif
+│  │  │  ├─ nuclei.tif
+│  │  ├─ img58
+│  │  │  ├─ annotation.json
+│  │  │  ├─ cells.tif
+│  │  │  ├─ nuclei.tif
+│  │   ...
+```
+
+## Data organization for prediction
+
+**ToDo**
+</attachment>
+
+<attachment name="annotation">
+<br>
+<p id="annotation">
+This plugin allows to annote the structures of interest, e.g. cells or nuclei. 
+The plugin was designed to read the above describe folder structure, i.e. opening the
+folder `data_for_training` will allow to annotate all contained images. 
+</p>
+
+Importantly, this plugin **runs entirely in your browser**. So you can perform annotation 
+on any device with browser support, e.g. tablets. Please note that the **files remain locally**
+on your device. The displayed `upload` confirmation is a security feature of the browser, 
+and the upload simply means that the data is provided within the browser.
+
+The annotated data can then be either **saved** for later use, or **sent directly to a ImJoy plugin** 
+engine (local or cloud) to perform training. 
+
+**ToDo illustrate workflow: annotation and send to plugin engine**
+
+## Import your images
+When starting the plugin, it will show a default image. If you want to familiarize yourself
+with the annotation features, you can already play around with this image.
+
+In order to load your own data, you have to 
+1.  Press on the `File` dropdown menu in the upper right corner
+2.  Select `Import Samples`
+3.  In the new dialog press `Choose Files` and then `Select Local Files`
+4.  In the dialog, select the **parental folder** containing all sample folders.
+5.  ImJoy will display a dialog saying "This will upload ....", confirm. Your
+    data **only be "uploaded" to your local browser** but not on an external website.
+6.  This will populate the interface with all files in your folder. For each folder,
+7.  you see a little icon representing a file being present in the folder. Hoovering over 
+    the icon will display its name.
+8.  You then have to set a filter on the file-name for the channel which will
+    be read into the Annotator plugin. For this you set a name for the channel,
+    e.g. `nuclei`, and the identifier of this image, e.g. `nuclei.tif`. Pressing on 
+    the icon of file, will populate the filter fields with a suggestion, which can 
+    be modified further. Press `Add Channel` to add this channel. You then see this 
+    channel as an additional column in the interface. 
+8.  Press `Import` to open the Annotator with the specified files.
+
+## Annotate structure of interest
+You can then specify your annotation: 
+1. From the `Annotation` dropdown menu, you can specify which annotations type you want to
+  outline. 
+2. By pressing `New Marker` you can specify an new annotation type. You can define
+  its name, the color in which it will show, and what outline type.
+
+**ToDo update screeenshot to show segmentation **
+<img src="https://www.dropbox.com/s/7x6ro3ldckv7cvb/screenshot-annotation.png?dl=1" class="img-responsive ..." alt="...">
+     
+## Navigate your image
+To faciliate the annotation, you can
+* Zoom
+* Pan (with the mouse button pressed)
+* Change contrast
+* Show multiple channels as an overlay
+* Display other annotation types.
+
+## Export annotations
+Once you are done, you can export the annotations from the `Exports` dropdown menu
+and selecting
+
+**ToDo update to give more details**
+
+</attachment>
+
+<attachment name="training">
+<br>
+<p id="training">
+Here you can select which input channels will be used for training. For each of these 
+channels you can then define different target masks and a loss function for each mask. 
+Lastly, you can post-process these images. 
+</p>
+
+**ToDo: screenshot**
+
+## Mask types
+Based on the annotations, different mask types can be calculated. These mask are the images the neural network will learn to predict (the so-called "targets"). 
+The following mask are supported
+
+**ToDo: correct names and more info**
+
+* **Filled (..)**: a binary image where all annoted objects are filled.
+* **Edge (..)**: a binary image where the contour of the objects are highlighted.
+* **Distance map (..)**: a gray level image showing for each object the distance to the closest boundary.
+
+<div class="container">
+  <div class="columns">
+    <div class="column col-xs-6"> Raw image<img src="https://www.dropbox.com/s/f9itwiqim6uu3zr/cells.png?dl=1" class="img-responsive ..." alt="...">
+ </div>
+    <div class="column col-xs-6"> Edge mask (...)  <img src="https://www.dropbox.com/s/7bdo1u6lt4bhfsm/cells__MASK_edge.png?dl=1" class="img-responsive ..." alt="...">
+  </div>
+</div>
+
+<br>
+
+<div class="container">
+  <div class="columns">
+    <div class="column col-xs-6">Filled mask (...)<img src="https://www.dropbox.com/s/ggrwbrqvpboy9pf/cells__MASK_fill.png?dl=1" class="img-responsive ..." alt="...">
+ </div>
+    <div class="column col-xs-6"> Distance map (...)   <img src="https://www.dropbox.com/s/iqy1lbjgq1glqk0/cells__MASK_distMap.png?dl=1" class="img-responsive ..." alt="...">
+  </div>
+</div>
+
+Should we show the weighted edge?
+
+<img src="https://www.dropbox.com/s/qdn85oj6zlwxthw/cells__MASK_edgeWeight.png?dl=1" class="img-responsive ..." alt="...">
+
+## Loss types
+To judge how well the network predicts a certain target image, you can specify the mathematical metric (the "loss") 
+that will used to compare the predicted images an the input image. The following loss types are supported
+
+**ToDo: correct names and more info**
+
+* **MSE (mean squared error)**: calculates the sum of the mean squared error for all pixels. Best suited for ...
+* **....**: calculates the .... . Best suited for ....
+
+## Postprocessing
+The unet architecture predicts only the specified image masks, but doesn't segment the invidual objects, e.g. cells and nuclei. 
+We propose different post-processing methods to obtain these objects
+**ToDo: correct names and more info**
+* ** ...**: seedless wathershed.
+* ** ...**: wathershed with seeds.
+
+The **resulting images** are stored as **ToDo: correct names and more info**. In this images, the background has a value of 0, and each object is a filled mask 
+with a constant pixel value. 
+
+</attachment>
+
+<attachment name="prediction">
+<h1 id="prediction">Prediction</h1>
+</attachment>
+
+<script lang="javascript">
+class ImJoyPlugin {
+  async setup() {
+    // For vue
+    this.app = new Vue({
+      el: '#app',
+      data: {
+        active_tab: 'summary'
+      },
+      methods: {
+        activateTab(name){
+          this.active_tab = name
+        },
+        focus(tab_name, section_id){
+          if(tab_name && section_id){
+            this.active_tab = tab_name
+            this.nextTick(()=>{
+              document.getElementById(section_id).scrollIntoView()
+            })
+          }
+        }
+      }
+    })
+    api.log('initialized')
+  }
+  async run(ctx) {
+      
+      document.getElementById('cont_summary').innerHTML =
+      marked(await api.getAttachment('summary'));
+      document.getElementById('cont_deeplearning').innerHTML =
+      marked(await api.getAttachment('deeplearning'));
+      document.getElementById('cont_data').innerHTML =
+      marked(await api.getAttachment('data')); 
+      document.getElementById('cont_annotation').innerHTML =
+      marked(await api.getAttachment('annotation'));
+      document.getElementById('cont_training').innerHTML =
+      marked(await api.getAttachment('training')); 
+      document.getElementById('cont_prediction').innerHTML =
+      marked(await api.getAttachment('prediction')); 
+      try {
+        console.log(ctx.data.tab, ctx.data.section)
+        this.app.focus(ctx.data.tab, ctx.data.section)
+        this.app.$forceUpdate()
+      }
+      catch(err) {
+      console.log(err)
+      }
+  }
+}
+api.export(new ImJoyPlugin())
+</script>
+
+<window lang="html">
+  <div id="app">
+    
+    <ul class="tab tab-block">
+      <li class="tab-item" v-bind:class="{ active: active_tab=='summary' }">
+        <a href="#" @click="active_tab='summary'">Summary</a>
+      </li>
+      <li class="tab-item" v-bind:class="{ active: active_tab=='deeplearning' }">
+         <a href="#" @click="active_tab='deeplearning'">Deep learning</a>
+      </li>
+      <li class="tab-item" v-bind:class="{ active: active_tab=='data' }">
+         <a href="#" @click="active_tab='data'">Data</a>
+      </li>
+      <li class="tab-item" v-bind:class="{ active: active_tab=='annotation' }">
+         <a href="#" @click="active_tab='annotation'">Annotation</a>
+      </li>
+      <li class="tab-item" v-bind:class="{ active: active_tab=='training' }">
+        <a href="#" @click="active_tab='training'">Training</a>
+      </li>
+      <li class="tab-item" v-bind:class="{ active: active_tab=='prediction' }">
+        <a href="#" @click="active_tab='prediction'">Prediction</a>
+      </li>
+    </ul>
+
+   <!-- This can eventually be replaced by a better organization, e.g. tabs -->
+   <div v-show="active_tab=='summary'" class="tab-content" id="cont_summary"></div>
+   <div v-show="active_tab=='deeplearning'" class="tab-content" id="cont_deeplearning"></div>
+   <div v-show="active_tab=='data'" class="tab-content" id="cont_data"></div>
+   <div v-show="active_tab=='annotation'" class="tab-content" id="cont_annotation"></div>
+   <div v-show="active_tab=='training'" class="tab-content" id="cont_training"></div>
+   <div v-show="active_tab=='prediction'" class="tab-content" id="cont_prediction"></div>
+
+  </div>
+</window>
+
+<style lang="css">
+
+.tab-content{
+  padding: 10px;
+}
+</style>
