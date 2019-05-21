@@ -1,7 +1,7 @@
 import os
 import cv2
 from scipy.misc import imread
-from raw_image import RawImageType
+from dataset.raw_image import RawImageType
 
 class MinSizeImageType(RawImageType):
     def finalyze(self, data):
