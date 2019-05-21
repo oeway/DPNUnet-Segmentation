@@ -110,9 +110,7 @@ class Evaluator:
     def predict(self, fold, val_indexes):
         prefix = ('fold' + str(fold) + "_") if self.test else ""
         val_dataset = SequentialDataset(self.ds, val_indexes, stage='test', config=self.config, transforms=self.val_transforms)
-        print("*****************val_dataset*******:", val_dataset)
         val_dl = PytorchDataLoader(val_dataset, batch_size=self.config.predict_batch_size, num_workers=self.num_workers, drop_last=False)
-        print("*********val_dl**********:", val_dl)
         model = read_model(self.folder, fold)
         pbar = tqdm.tqdm(val_dl, total=len(val_dl))
         for data in pbar:

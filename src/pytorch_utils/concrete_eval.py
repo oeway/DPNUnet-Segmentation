@@ -19,7 +19,7 @@ class FullImageEvaluator(Evaluator):
 
     def save(self, name, prediction, prefix=""):
         if self.test:
-            path = os.path.join(self.config.dataset_path, name)
+            path = os.path.join(self.config.dataset_path, self.ds.fn_mapping['images'](name))
         else:
             path = os.path.join(self.config.dataset_path, 'images_all', name)
         rows, cols = cv2.imread(path, 0).shape[:2]
@@ -31,4 +31,9 @@ class FullImageEvaluator(Evaluator):
             prediction = cv2.cvtColor(prediction, cv2.COLOR_RGB2BGR)
         if self.test:
             name = os.path.split(name)[-1]
-        cv2.imwrite(os.path.join(self.save_dir, prefix + name), (prediction * [255,255,0]).astype(np.uint8))
+        save_path = os.path.join(self.save_dir, prefix + self.ds.fn_mapping['masks'](name))
+        print('saving to ',  save_path)
+        folder, name = os.path.split(save_path)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        cv2.imwrite(save_path, (prediction * [255,255,0]).astype(np.uint8))
