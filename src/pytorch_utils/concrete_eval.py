@@ -31,7 +31,7 @@ class FullImageEvaluator(Evaluator):
             prediction = cv2.cvtColor(prediction, cv2.COLOR_RGB2BGR)
         if self.test:
             name = os.path.split(name)[-1]
-        save_path = os.path.join(self.save_dir + prefix, self.ds.fn_mapping['masks'](name))
+        save_path = os.path.join(self.config.dataset_path, self.ds.fn_mapping['masks'](name)) # os.path.join(self.save_dir + prefix, self.ds.fn_mapping['masks'](name))
         print('saving to ',  save_path)
         folder, name = os.path.split(save_path)
         if not os.path.exists(folder):

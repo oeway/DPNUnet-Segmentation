@@ -32,8 +32,10 @@ paths = {
     'labels': '',
 }
 
+name, ext = os.path.splitext(config.mask_file_name)
+
 fn_mapping = {
-    'masks': lambda name: '{}/{}'.format(name, config.mask_file_name),
+    'masks': lambda name: '{}/{}'.format(name, config.mask_file_name if args.training else name+'_output'+ext ),
     'images': lambda name: '{}/{}'.format(name, config.image_file_name),
     'labels': lambda name: name
 }
