@@ -44,6 +44,9 @@ class FullImageEvaluator(Evaluator):
         folder, _ = os.path.split(save_path)
         if not os.path.exists(folder):
             os.makedirs(folder)
-        cv2.imwrite(save_path, (prediction * [255,255,0]).astype(np.uint8))
+
+        img = (prediction * [255,255,0]).astype(np.uint8)
+        img = cv2.resize(img, (rows, cols))
+        cv2.imwrite(save_path, img)
 
         self.step_callback({'output_path': save_path, 'input_path': input_path, 'name': name})
