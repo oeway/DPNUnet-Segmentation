@@ -27,7 +27,8 @@ class FullImageEvaluator(Evaluator):
             path = os.path.join(self.config.dataset_path, self.ds.fn_mapping['images'](name))
         else:
             path = os.path.join(self.config.dataset_path, 'images_all', name)
-        rows, cols = cv2.imread(path, 0).shape[:2]
+        input_image = cv2.imread(path, 0)
+        rows, cols = input_image.shape[:2]
         prediction = prediction[0:rows, 0:cols,...]
         if prediction.shape[2] < 3:
             zeros = np.zeros((rows, cols), dtype=np.float32)
@@ -41,7 +42,7 @@ class FullImageEvaluator(Evaluator):
 
         do_save = True
         if self.step_callback is not None:
-            skip_save = self.step_callback({'prediction': prediction, 'save_path': save_path, 'name': name})
+            skip_save = self.step_callback({'output': prediction, 'input': input_image, 'save_path': save_path, 'name': name})
             if skip_save:
                 do_save = False
 
