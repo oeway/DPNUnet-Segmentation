@@ -108,6 +108,26 @@ class Evaluator:
         self.val_transforms = val_transforms
         os.makedirs(self.save_dir, exist_ok=True)
 
+    def predict_batch(model, batch, cropping=None):
+        predicted_batch = predict8tta(model, batch, self.config.sigmoid)
+        results = []
+        if cropping is not None:
+            rows, cols = cropping
+        else:
+            orig_shape = predicted_batch[0,...].shape
+            rows, cols = orig_shape[:2]
+        for b in range(predicted_batch):
+            prediction = predicted_batch[i,...]
+            prediction = prediction[0:rows, 0:cols,...]
+            if prediction.shape[2] < 3:
+                zeros = np.zeros((rows, cols), dtype=np.float32)
+                prediction = np.dstack((prediction[...,0], prediction[...,1], zeros))
+            else:
+                prediction = cv2.cvtColor(prediction, cv2.COLOR_RGB2BGR)
+            results.append(prediction)
+        return results
+        
+
     def predict(self, model_path, val_indexes, prefix):
         val_dataset = SequentialDataset(self.ds, val_indexes, stage='test', config=self.config, transforms=self.val_transforms)
         val_dl = PytorchDataLoader(val_dataset, batch_size=self.config.predict_batch_size, num_workers=self.num_workers, drop_last=False)
