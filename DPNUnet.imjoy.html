@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -86,6 +86,7 @@ from merge_preds import merge_files
 import json
 import cv2
 from scipy.misc import imread
+import base64
 
 import argparse
 
@@ -173,7 +174,7 @@ def train_bowl(dash, config, paths, fn_mapping, save_path, log_path):
     train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=num_workers, callbacks=[updateUI], save_path=save_path, log_path=log_path, transforms=aug_victor(.97))
 
 
-def eval_bowl(dash, config, paths, fn_mapping, model_path):
+def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images):
     asyncio.set_event_loop(loop)
     config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', False)
     test = True
@@ -186,14 +187,22 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path):
     num_workers = 0 if os.name == 'nt' else 4
     api.showStatus('start prediction ...')
     dash.setLoading({'status_text': 'Start Prediction...', 'loading': True})
+
     def step_callback(result_dict):
         dash.setLoading({'status_text': 'Start prediction: ' + result_dict['name'], 'loading': True})
-        api.log('result saved to ' + result_dict['save_path'])
+        api.log('result saved to ' + result_dict['output_path'])
+        asyncio.ensure_future(plot_images(result_dict['name'], {'input image': result_dict['input_path'], 'predicted mask': result_dict['output_path']}))
     keval = FullImageEvaluator(config, ds, test=test, flips=3, step_callback=step_callback,  num_workers=num_workers, border=0)
     fold =  0
     
-    keval.predict(model_path, val_indexes, ('fold' + str(fold) + "_") if test else "")
-    merge_files(keval.save_dir)
+    try:
+        keval.predict(model_path, val_indexes, ('fold' + str(fold) + "_") if test else "")
+        merge_files(keval.save_dir)
+    except Exception as e:
+        raise
+    finally:
+        dash.setLoading({'status_text': 'Prediction Done.', 'loading': False})
+    
 
 
 def postprocessing(test_dir, step_callback):
@@ -234,6 +243,33 @@ class ImJoyPlugin():
                     'data': {}
                     })
 
+    async def plot_images(self, label, images):
+        try:
+            displays = {}
+            for k in images:
+                with open(images[k], "rb") as image_file:
+                    img_str = base64.b64encode(image_file.read()).decode('ascii')
+                imgurl = 'data:image/png;base64,' + img_str
+                displays[k] = imgurl
+            await self.dash.appendDisplay(label, displays)
+        except Exception as e:
+            api.log('error: '+str(e))
+    
+    async def plot_tensors(self, tensor_list, label, titles=None):
+        image_list = [tensor.detach().cpu().numpy().reshape(tensor.shape[-2], tensor.shape[-1]) for tensor in tensor_list]
+        displays = {}
+        titles = titles or [ 'Tensor '+str(i) for i in range(len(image_list))]
+        for i in range(len(image_list)):
+            im = image_list[i]
+            min = im.min()
+            im = Image.fromarray(((im-min)/(im.max()-min)*255).astype('uint8'))
+            buffered = BytesIO()
+            im.save(buffered, format="JPEG")
+            img_str = base64.b64encode(buffered.getvalue()).decode('ascii')
+            imgurl = 'data:image/png;base64,' + img_str
+            displays[titles[i]] = imgurl
+        await self.dash.appendDisplay(label, displays)
+
     async def predict(self):
         if self.dialog is not None:
             self.dialog.close()
@@ -250,8 +286,8 @@ class ImJoyPlugin():
         config.batch_size = 16
         config.epoch_size = 24
         model_path = os.path.join('..', 'weights', config.folder, 'fold0_best.pth') # '../weights/dpn_softmax_f0/fold0_best.pth'
-        self.dash = await api.createWindow(type="Im2Im-Dashboard", name=" DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
-        await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping, model_path)
+        self.dash = await api.createWindow(type="Im2Im-Dashboard", name="DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all'})
+        await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping, model_path, self.plot_images)
 
 
         await api.showStatus('Start post-processing...')
@@ -286,7 +322,7 @@ class ImJoyPlugin():
         config.nb_epoch = options.epochs
         config.batch_size = 16
         config.epoch_size = 24
-        log_path =  os.path.join('..', 'logs', config.folder, 'fold{}'.format(fold))
+        log_path =  os.path.join('..', 'logs', config.folder, 'fold0')
         save_path = os.path.join('..', 'weights', config.folder)
         api.log(f'model will be saved to {save_path}')
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Training DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
