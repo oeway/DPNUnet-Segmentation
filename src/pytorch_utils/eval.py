@@ -58,16 +58,14 @@ def predict(model, batch, flips=flip.FLIP_NONE):
         return to_numpy(new_mask)
     return to_numpy(F.sigmoid(pred1))
 
-def predict8tta(model, batch, sigmoid, pre_scale):
+def predict8tta(model, batch, sigmoid):
     ret = []
     for cls in TTA:
         ret.append(cls(sigmoid)(model, batch))
     scale_tta = False
     if scale_tta:
-        data = np.moveaxis(np.squeeze(batch.numpy()[0]), 0, -1)
-        if pre_scale != 1.0:
-            data = cv2.resize(data, (0, 0), fx=pre_scale, fy=pre_scale)
         for scale in [0.8, 1.25]:
+            data = np.moveaxis(np.squeeze(batch.numpy()[0]), 0, -1)
             srows, scols = data.shape[:2]
             data = cv2.resize(data, (0, 0), fx=scale, fy=scale)
             rows, cols = data.shape[:2]
@@ -110,7 +108,7 @@ class Evaluator:
         self.val_transforms = val_transforms
         os.makedirs(self.save_dir, exist_ok=True)
 
-    def predict(self, model, val_indexes, prefix, scale=1.0):
+    def predict(self, model, val_indexes, prefix):
         val_dataset = SequentialDataset(self.ds, val_indexes, stage='test', config=self.config, transforms=self.val_transforms)
         val_dl = PytorchDataLoader(val_dataset, batch_size=self.config.predict_batch_size, num_workers=self.num_workers, drop_last=False)
         if type(model) is str:
@@ -119,7 +117,7 @@ class Evaluator:
         for data in pbar:
             samples = data['image']
             # predicted = predict(model, samples, flips=self.flips)
-            predicted = predict8tta(model, samples, self.config.sigmoid, scale)
+            predicted = predict8tta(model, samples, self.config.sigmoid)
             self.process_batch(predicted, model, data, prefix=prefix)
         self.post_predict_action(prefix=prefix)
 

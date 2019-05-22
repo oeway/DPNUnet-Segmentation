@@ -8,11 +8,12 @@ class AlphaNotAvailableException(Exception):
     pass
 
 class AbstractImageType:
-    def __init__(self, paths, fn, fn_mapping, has_alpha=False):
+    def __init__(self, paths, fn, fn_mapping, has_alpha=False, scale_factor=1.0):
         self.paths = paths
         self.fn = fn
         self.has_alpha = has_alpha
         self.fn_mapping = fn_mapping
+        self.scale_factor = scale_factor
         self.cache = {}
 
     @property
