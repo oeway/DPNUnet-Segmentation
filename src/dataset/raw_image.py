@@ -1,5 +1,5 @@
 import os
-from scipy.misc import imread
+from scipy.misc import imread, imresize
 import cv2
 
 from dataset.abstract_image_type import AbstractImageType, AlphaNotAvailableException
