@@ -312,11 +312,14 @@ class PytorchTrain:
         self.callbacks.on_train_end()
 
 
-def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transforms=None, val_transforms=None, num_channels_changed=False, final_changed=False, cycle=False, callbacks=[]):
-    os.makedirs(os.path.join('..', 'weights'), exist_ok=True)
-    os.makedirs(os.path.join('..', 'logs'), exist_ok=True)
+def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transforms=None, val_transforms=None, num_channels_changed=False, final_changed=False, cycle=False, callbacks=[], save_path=None, log_path=None):
+    if log_path is None:
+        log_path = os.path.join('..', 'logs', config.folder, 'fold{}'.format(fold))
+    if save_path is None:
+        save_path = os.path.join('..', 'weights', config.folder)
 
-    save_path = os.path.join('..', 'weights', config.folder)
+    os.makedirs(log_path, exist_ok=True)
+    os.makedirs(save_path, exist_ok=True)
     model = models[config.network](num_classes=config.num_classes, num_channels=config.num_channels)
     estimator = Estimator(model, optimizers[config.optimizer], save_path,
                           config=config, num_channels_changed=num_channels_changed, final_changed=final_changed)
@@ -329,7 +332,7 @@ def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transform
         # LRDropCheckpointSaver(("fold"+str(fold)+"_checkpoint_e{epoch}.pth")),
         ModelFreezer(),
         # EarlyStopper(10),
-        TensorBoard(os.path.join('..', 'logs', config.folder, 'fold{}'.format(fold)))
+        TensorBoard(log_path)
     ]
     # if not num_channels_changed:
     #     callbacks.append(LastCheckpointSaver("fold"+str(fold)+"_checkpoint_rgb.pth", config.nb_epoch))
