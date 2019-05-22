@@ -30,18 +30,33 @@
 
 <attachment name="summary">
 <br>
-<p id="segmentation-summary"> THis is the documentation for a complete framework to perform image segmentation with deep learning.
+<p id="segmentation-summary"> 
+  In this documentation we describe a complete workflow to perform segmentation of nuclei with deep learning.
 </p>
 
-**ToDo: ADD screenshot of segmentation results**
+<figure>
+    <img src=" "  class="img-responsive p-centered" alt="nuclei-segmentaton">
+    <figcaption>Nuclei segmentation: DAPI (left), segmented nuclei (right).</figcaption>
+</figure>
 
-In this document we describe the plugins to perform all steps:
+The segmentation itself is perform largely by the winning approach (DPNUnet) of the 2018 Kaggle Data Science Bowl.
 
-* Annotation
-* Training including post-processing to obtain objects
-* Prediction
+* **Description of DPNUnet**: <a onclick="api.utils.openUrl('https://www.kaggle.com/c/data-science-bowl-2018/discussion/54741')">https://www.kaggle.com/c/data-science-bowl-2018/discussion/54741</a>,
+Nature Methods, 2018
+* **GitHub**: <a onclick="api.utils.openUrl('https://github.com/selimsef/dsb2018_topcoders/')">https://github.com/selimsef/dsb2018_topcoders/</a>
 
-**ToDo illustrate workflow**
+When starting the DPNUnet-Segmentation plugin, you will see a **central launch pad** allowing to select the task to be performed:
+
+<figure>
+    <img src="https://www.dropbox.com/s/8komkrwt1tllj6u/dpnunet-launchpad.PNG?dl=1" width="600" class="img-responsive p-centered" alt="segmentation-launchpad">
+    <figcaption>Screen shot of DPNUnet-Segmentation launchpad.</figcaption>
+</figure>
+
+**Highlights of the workflow**
+
+* Plugin for annotation of your own data and creating image mask suitable for training of DPNUnet
+* Train on your own data starting with the pre-trained DPNUnet
+* Perform nuclei segmentation on new data and inspect results in interative tool
 
 
 </attachment> 
@@ -62,8 +77,11 @@ which accomplishes simple signal processing. These perceptrons are then
 connected into a large mesh network. 
 Importantly, such a network has to be trained before prediction can be performed. 
 
-<img src="https://www.dropbox.com/s/hbg3c23gwfedu0p/neural_network.png?dl=1" class="img-responsive ..." alt="Neural network scheme.">
-   
+<figure>
+    <img src="https://www.dropbox.com/s/hbg3c23gwfedu0p/neural_network.png?dl=1" width="300" class="img-responsive p-centered" alt="anna-palm-reconstruction">
+    <figcaption>Basic structure of a neural network.</figcaption>
+</figure>
+
 <h2>Train a neural network</h2>
 To train a neural network annotated data has to be provided, for instance a DAPI image 
 with outlined nuclei. These data are then used by the neural network to learn how
@@ -81,8 +99,11 @@ Eventually the model will describe the training data too well and not generalize
 anymore to new data (**overfitting**). Good training finds the sweet spot between these two 
 extreme cases. 
 
-<img src="https://www.dropbox.com/s/inlro9emd2yk1y6/training_validation.png?dl=1" class="img-responsive ..." alt="Neural network scheme.">
-  
+<figure>
+    <img src="https://www.dropbox.com/s/inlro9emd2yk1y6/training_validation.png?dl=1" width="400" class="img-responsive p-centered" alt="anna-palm-reconstruction">
+    <figcaption>Training and validation loss during training.</figcaption>
+</figure>
+ 
 Training a neural network is **computationally expensive** and is best performed on 
 **GPUs** (Graphics Processing Unit) or computational clusters. Applying a trained model is less
 demanding and can be done on routinely on regular computers, and depending on the implementation
@@ -99,48 +120,50 @@ model is used as the starting point to perform training on the new data.
 Here we describe how the training images have to be provided: image format, naming scheme, and data organization. 
 </p>
 
-<h2>Image formats</h2>
-**Segmentation in this workflow is performed on 2D images**. 3D images have to be converted to 2D, e.g. with 
-a maximum intensity projection. Images can be stored either as **png** or **tif** files.
+## Data organization for training
 
-<h2>Data organization for training</h2>
-To perform training, you have to provide both the input images as well as the annotations.
-We described in a dedicated section how to create the later. 
+Training data has to be organized with the following folder structure:
+* Traing and validation data has to be stored in two folders **train** and **test**, respectively. 
+* Each sample (e.g. a field of view) is stored in a separate subfolder with a unique name.
 
-These data have to be organised
-according to following guidelines, resulting in an organisation as shown below.
-1. Data has to be stored in two folders **train**, **valid**. 
-The `train` folder will be used to train the neural network, the `valid` folder
-to continuously monitor how well the training worked.
-2. Each sample (for instance a field of view) is stored in a separate subfolder
-3. File names for different channels have to be identical across subfolders, i.e. a 
-   a DAPI image is always called `nuclei.tif`.
+Images have to be provided as follows:
+* **Filenames have to be identical** across these subfolders, e.g. `nuclei.png`
+* Image have to be **2D**. 3D images have to be converted to 2D, e.g. with a maximum intensity projection. 
+* Images are stored as **RGB PNGs**.
+
+We then provide plugins to annotate images and create masks:
+* **Annotations** can be created with a dedicated plugin resulting in file `annotation.json` within each subfolder. More details
+are provided in the dedicated section. 
+* The network will learn to predict different mask types (`nuclei_masks.png`), which can be created with a dedicated plugin. 
+
+This will result in the following folder structure
 ```
-
 ├─ data_for_training/
 │  ├─ train/
 │  │  ├─ img1
 │  │  │  ├─ annotation.json
-│  │  │  ├─ cells.tif
-│  │  │  ├─ nuclei.tif
+│  │  │  ├─ nuclei.png
+│  │  │  ├─ nuclei_masks.png
 │  │  ├─ img2
 │  │  │  ├─ annotation.json
-│  │  │  ├─ cells.tif
-│  │  │  ├─ nuclei.tif
+│  │  │  ├─ nuclei.png
+│  │  │  ├─ nuclei_masks.png
 │  │  ...
-│  ├─ valid/
+│  ├─ test/
 │  │  ├─ img57
 │  │  │  ├─ annotation.json
-│  │  │  ├─ cells.tif
-│  │  │  ├─ nuclei.tif
+│  │  │  ├─ nuclei.png
+│  │  │  ├─ nuclei_masks.png
 │  │  ├─ img58
 │  │  │  ├─ annotation.json
-│  │  │  ├─ cells.tif
-│  │  │  ├─ nuclei.tif
+│  │  │  ├─ nuclei.png
+│  │  │  ├─ nuclei_masks.png
 │  │   ...
 ```
 
-## Data organization for prediction
+https://www.dropbox.com/sh/8pfim9t21rrheni/AAB-x4Gk44FrSu1_6k9TXCQwa?dl=0
+
+## Data for prediction
 
 **ToDo**
 </attachment>
@@ -148,30 +171,28 @@ to continuously monitor how well the training worked.
 <attachment name="annotation">
 <br>
 <p id="annotation">
-This plugin allows to annote the structures of interest, e.g. cells or nuclei. 
+This plugin allows to annote the structures of interest, i.e. nuclei. 
 The plugin was designed to read the above describe folder structure, i.e. opening the
 folder `data_for_training` will allow to annotate all contained images. 
 </p>
 
-Importantly, this plugin **runs entirely in your browser**. So you can perform annotation 
-on any device with browser support, e.g. tablets. Please note that the **files remain locally**
-on your device. The displayed `upload` confirmation is a security feature of the browser, 
-and the upload simply means that the data is provided within the browser.
+## Load data on plugin engine
+1. Prepare training data as specified in the section 'Data'.
+2. You can drag and drop the folder containing the subfolder 'train' and 'test'  to the plugin engine. 
+3. In ImJOy, press `Files`, and `Open Engine File`.
+4. If ImJoy is connected to multiple plugin engines, select the one where the segmentation plugin is running on.
+5. Navigate to the folder where you want to load your data. 
+5. Drag & drop the folder containing the training data into this folder.
 
-The annotated data can then be either **saved** for later use, or **sent directly to a ImJoy plugin** 
-engine (local or cloud) to perform training. 
-
-**ToDo illustrate workflow: annotation and send to plugin engine**
-
-## Import your images
+## Import your images into Annotator plugin
 When starting the plugin, it will show a default image. If you want to familiarize yourself
 with the annotation features, you can already play around with this image.
 
 In order to load your own data, you have to 
 1.  Press on the `File` dropdown menu in the upper right corner
 2.  Select `Import Samples`
-3.  In the new dialog press `Choose Files` and then `Select Local Files`
-4.  In the dialog, select the **parental folder** containing all sample folders.
+3.  In the new dialog press `Choose Files` and then `Select Plugin Files`
+4.  In the dialog, select the folder with the training data.
 5.  ImJoy will display a dialog saying "This will upload ....", confirm. Your
     data **only be "uploaded" to your local browser** but not on an external website.
 6.  This will populate the interface with all files in your folder. For each folder,
@@ -179,7 +200,7 @@ In order to load your own data, you have to
     the icon will display its name.
 8.  You then have to set a filter on the file-name for the channel which will
     be read into the Annotator plugin. For this you set a name for the channel,
-    e.g. `nuclei`, and the identifier of this image, e.g. `nuclei.tif`. Pressing on 
+    e.g. `nuclei`, and the identifier of this image, e.g. `nuclei.ong`. Pressing on 
     the icon of file, will populate the filter fields with a suggestion, which can 
     be modified further. Press `Add Channel` to add this channel. You then see this 
     channel as an additional column in the interface. 
@@ -193,7 +214,7 @@ You can then specify your annotation:
   its name, the color in which it will show, and what outline type.
 
 **ToDo update screeenshot to show segmentation **
-<img src="https://www.dropbox.com/s/7x6ro3ldckv7cvb/screenshot-annotation.png?dl=1" class="img-responsive ..." alt="...">
+<img src="https://www.dropbox.com/s/7x6ro3ldckv7cvb/screenshot-annotation.png?dl=1" width="500" class="img-responsive ..." alt="...">
      
 ## Navigate your image
 To faciliate the annotation, you can
@@ -209,75 +230,64 @@ and selecting
 
 **ToDo update to give more details**
 
+## Generate masks
+Once your images are annotated, you can generate masks that will be predicted by the network and used 
+to segment the nuclei. Two mask types are used in DPNUnet: filled and border.
+
+<div class="container">
+  <div class="columns">
+    <div class="column col-xs-6">Filled mask<img src="https://www.dropbox.com/s/ggrwbrqvpboy9pf/cells__MASK_fill.png?dl=1" class="img-responsive ..." alt="...">
+ </div>
+    <div class="column col-xs-6"> Border mask   <img src="https://www.dropbox.com/s/qdn85oj6zlwxthw/cells__MASK_edgeWeight.png?dl=1" class="img-responsive ..." alt="...">
+  </div>
+</div>
+
+When pressing the button `Generate Masks`, a dialog pops up where you can specify the folder containing your annotated 
+training and validation data. Masks will then be generated for all annotations and stored as PNG file named `nuclei_masks.png`
 </attachment>
 
 <attachment name="training">
 <br>
 <p id="training">
-Here you can select which input channels will be used for training. For each of these 
-channels you can then define different target masks and a loss function for each mask. 
-Lastly, you can post-process these images. 
+Here you can re-train the pre-trained DPNUnet model on your own data. 
 </p>
 
-**ToDo: screenshot**
+In order to re-train you have to 
+1. Press button 'Train with data from engine'
+2. This will show a configuration dialog, where you can specify the filename of the input images, e.g. `nuclei.png`, and the target masks, e.g. `nuclei_masks.png`. 
+ Further you can specify for how many epochs the network will train, and under which name the model will be saved.
+<figure>
+    <img src="https://www.dropbox.com/s/f0wqnjs67jriabt/dpnunet-training-config.PNG?dl=1" width="400" class="img-responsive p-centered" alt="training-config">
+    <figcaption>Training and validation loss during training.</figcaption>
+</figure>
+3. Specify the training data, i.e. the folder containing subfolders 'train' and 'valid'.
+4. Training progress can be inspected with the dashboard. 
 
-## Mask types
-Based on the annotations, different mask types can be calculated. These mask are the images the neural network will learn to predict (the so-called "targets"). 
-The following mask are supported
+<figure>
+    <img src="https://www.dropbox.com/s/inlro9emd2yk1y6/training_validation.png?dl=1" width="400" class="img-responsive p-centered" alt="training-dashboard">
+    <figcaption>Monitoring training progress with the dashboard.</figcaption>
+</figure>
 
-**ToDo: correct names and more info**
 
-* **Filled (..)**: a binary image where all annoted objects are filled.
-* **Edge (..)**: a binary image where the contour of the objects are highlighted.
-* **Distance map (..)**: a gray level image showing for each object the distance to the closest boundary.
-
-<div class="container">
-  <div class="columns">
-    <div class="column col-xs-6"> Raw image<img src="https://www.dropbox.com/s/f9itwiqim6uu3zr/cells.png?dl=1" class="img-responsive ..." alt="...">
- </div>
-    <div class="column col-xs-6"> Edge mask (...)  <img src="https://www.dropbox.com/s/7bdo1u6lt4bhfsm/cells__MASK_edge.png?dl=1" class="img-responsive ..." alt="...">
-  </div>
-</div>
-
-<br>
-
-<div class="container">
-  <div class="columns">
-    <div class="column col-xs-6">Filled mask (...)<img src="https://www.dropbox.com/s/ggrwbrqvpboy9pf/cells__MASK_fill.png?dl=1" class="img-responsive ..." alt="...">
- </div>
-    <div class="column col-xs-6"> Distance map (...)   <img src="https://www.dropbox.com/s/iqy1lbjgq1glqk0/cells__MASK_distMap.png?dl=1" class="img-responsive ..." alt="...">
-  </div>
-</div>
-
-Should we show the weighted edge?
-
-<img src="https://www.dropbox.com/s/qdn85oj6zlwxthw/cells__MASK_edgeWeight.png?dl=1" class="img-responsive ..." alt="...">
-
-## Loss types
-To judge how well the network predicts a certain target image, you can specify the mathematical metric (the "loss") 
-that will used to compare the predicted images an the input image. The following loss types are supported
-
-**ToDo: correct names and more info**
-
-* **MSE (mean squared error)**: calculates the sum of the mean squared error for all pixels. Best suited for ...
-* **....**: calculates the .... . Best suited for ....
-
-## Postprocessing
-The unet architecture predicts only the specified image masks, but doesn't segment the invidual objects, e.g. cells and nuclei. 
-We propose different post-processing methods to obtain these objects
-**ToDo: correct names and more info**
-* ** ...**: seedless wathershed.
-* ** ...**: wathershed with seeds.
-
-The **resulting images** are stored as **ToDo: correct names and more info**. In this images, the background has a value of 0, and each object is a filled mask 
-with a constant pixel value. 
+The **trained model ** are stored as **ToDo: correct names and more info**, and can then be used for prediction.
 
 </attachment>
 
 <attachment name="prediction">
-<h1 id="prediction">Prediction</h1>
-</attachment>
 
+For prediction, you have
+1. Press button 'Predict'
+2. This will show a configuration dialog, where you can specify the filename of the input images, e.g. `nuclei.png`, and the target masks, e.g. `nuclei_masks.png`. 
+<figure>
+    <img src="https://www.dropbox.com/s/f0wqnjs67jriabt/dpnunet-predict-config.PNG?dl=1" width="400" class="img-responsive p-centered" alt="training-config">
+    <figcaption>Training and validation loss during training.</figcaption>
+</figure>
+3. Select a folder containg a subfolder testing.
+
+
+WHich model is used?
+How does test data have to be organized? also in individual folders?
+</attachment>
 <script lang="javascript">
 class ImJoyPlugin {
   async setup() {
@@ -344,7 +354,7 @@ api.export(new ImJoyPlugin())
          <a href="#" @click="active_tab='data'">Data</a>
       </li>
       <li class="tab-item" v-bind:class="{ active: active_tab=='annotation' }">
-         <a href="#" @click="active_tab='annotation'">Annotation</a>
+         <a href="#" @click="active_tab='annotation'">Annotation & masks</a>
       </li>
       <li class="tab-item" v-bind:class="{ active: active_tab=='training' }">
         <a href="#" @click="active_tab='training'">Training</a>
@@ -370,4 +380,13 @@ api.export(new ImJoyPlugin())
 .tab-content{
   padding: 10px;
 }
+
+figcaption {
+    background-color: #fff;
+    color: #a1c8f2;
+    font: italic smaller sans-serif;
+    padding: 3px;
+    text-align: center;
+}
+
 </style>
