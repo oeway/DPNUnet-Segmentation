@@ -27,6 +27,7 @@ class FullImageEvaluator(Evaluator):
             path = os.path.join(self.config.dataset_path, self.ds.fn_mapping['images'](name))
         else:
             path = os.path.join(self.config.dataset_path, 'images_all', name)
+        assert os.path.exists(path), 'input file not found:'+path
         rows, cols = cv2.imread(path, 0).shape[:2]
         prediction = prediction[0:rows, 0:cols,...]
         if prediction.shape[2] < 3:
