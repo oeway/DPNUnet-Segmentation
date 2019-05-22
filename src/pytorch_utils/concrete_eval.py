@@ -37,7 +37,7 @@ class FullImageEvaluator(Evaluator):
         if self.test:
             name = os.path.split(name)[-1]
         
-        save_path = os.path.join(self.config.dataset_path, self.ds.fn_mapping['masks'](name)) # os.path.join(self.save_dir + prefix, self.ds.fn_mapping['masks'](name))
+        save_path = os.path.join(self.save_dir, self.ds.fn_mapping['masks'](name)) # os.path.join(self.save_dir + prefix, self.ds.fn_mapping['masks'](name))
 
         do_save = True
         if self.step_callback is not None:
