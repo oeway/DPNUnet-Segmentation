@@ -283,7 +283,7 @@ class ImJoyPlugin():
             await api.showStatus(f'Processing {i}/{total}: {file_id}')
             file_path = os.path.join(datasets_dir, "train", file_id, "annotation.json")
             try:
-                gen_mask_from_geojson([file_path], masks_to_create_value=["weighted_boarder"])
+                gen_mask_from_geojson([file_path], masks_to_create_value=["border_mask"])
             except:
                 print("generate mask error:", os.path.join(datasets_dir, "train", file_id))
         await api.showProgress(100)

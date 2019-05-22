@@ -3,7 +3,7 @@
   "iter_size": 1,
   "dataset_path": "/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1",
   "image_file_name": "nuclei.png",
-  "mask_file_name": "nuclei_weighted_boarder.png",
+  "mask_file_name": "nuclei_border_mask.png",
   "folder": "dpn_softmax_f0",
   "lr": 5e-5,
   "lr_steps": [[8, 1e-5], [12, 5e-6], [15, 1e-6]],

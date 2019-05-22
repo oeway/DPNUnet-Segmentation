@@ -140,7 +140,7 @@ def gen_mask_from_geojson(files_proc, masks_to_create_value=['filled', 'edge', '
 
             # border_mask
             if 'border_mask' in masks_to_create[annot_type]:
-                print(' .... creating weighted boarder masks .....')
+                print(' .... creating border masks .....')
                 mask_dict = borderMasks.generate(annot_dict,mask_dict)
 
                 # Save
