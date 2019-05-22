@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -87,6 +87,7 @@ import json
 import cv2
 from scipy.misc import imread
 import base64
+from shutil import copyfile
 
 import argparse
 
@@ -132,6 +133,10 @@ class UpdateUI(Callback):
             api.log('batch:'+str(batch) + ' '+ str(logs))
             if 'loss' in logs:
                 self.dash.updateCallback('onStep', self.step, {'loss': float(str(logs['loss']))})
+        #if self.current_results is not None:
+        #    current_results = self.current_results
+        #    plot_tensors(self.dash, [current_results['inputs'], current_results['outputs'], current_results['target']], label, ['inputs', 'outputs', 'target'])
+
         self.step += 1
 
     def on_epoch_end(self, epoch):
@@ -144,8 +149,7 @@ class UpdateUI(Callback):
         api.showStatus('training epoch:'+str(self.epoch)+'/'+str(self.total_epoch))
         api.log('epoch:'+str(self.epoch)+'/'+str(self.total_epoch) + ' '+ str(logs))
         #current_results['inputs': images, 'outputs': ypreds, 'target': ytrues]
-        #plot_tensors(self.dash, tensor_list, label, titles)
-
+        
 
 def load_config(config_path):
     with open(config_path, 'r') as f:
@@ -212,7 +216,7 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_fa
     im_val_type = PaddedImageType if not config.sigmoid else PaddedSigmoidImageType
     im_prov_type = InFolderImageProvider if test else ReadingImageProvider
     ds = im_prov_type(im_val_type, paths, fn_mapping, scale_factor=scale_factor)
-    num_workers = 0 if os.name == 'nt' else 4
+    num_workers = 0 # if os.name == 'nt' else 4
     api.showStatus('start prediction ...')
     dash.setLoading({'status_text': 'Start Prediction...', 'loading': True})
 
@@ -247,11 +251,17 @@ def postprocessing(test_dir, step_callback):
         if step_callback:
             step_callback({'name': id_, 'step': n, 'total': total})
 
+if os.path.exists('/imjoy/imjoy-paper'):
+    ROOT_DIR = '/imjoy/imjoy-paper'
+else:
+    ROOT_DIR = ''
+
 class ImJoyPlugin():
     def __init__(self):
         self.dialog = None
     async def run(self, ctx):
         self.dialog = await api.showDialog(type='launchpad', data= [
+                {'name': 'Load trained model', 'description': 'Load a pre-trained model', 'callback': self.load_model, 'img': 'https://img.icons8.com/ios-glyphs/48/000000/submit-progress.png'},
                 {'name': 'Annotate images', 'description': 'Start annotation of images.', 'callback': self.start_annotation, 'img': 'https://img.icons8.com/color/96/000000/edit.png'},
                 {'name': 'Generate masks', 'description': 'Generate masks from annotations for training.', 'callback': self.generate_masks, 'img': 'https://img.icons8.com/color/96/000000/metamorphose.png'},
                 {'name': 'Train with data from the engine', 'description': 'Use training data stored on a (local or remote) plugin engine.', 'callback': self.train, 'img': 'https://img.icons8.com/color/96/000000/services.png'},
@@ -285,15 +295,32 @@ class ImJoyPlugin():
         except Exception as e:
             api.log('error: '+str(e))
     
-
+    async def load_model(self):
+        #if self.dialog is not None:
+        #    self.dialog.close()
+    
+        workdirObj = await api.showFileDialog(type='file', name="Please select your model folder (typically named `fold0_best.pth`)", root=os.path.join(ROOT_DIR, "SEGMENTATION-MODELS"), engine=api.ENGINE_URL)
+        if workdirObj:
+            try:
+                api.showStatus('load pretrained model ...')
+                save_path = os.path.join('..', 'weights', 'dpn_softmax_f0', 'fold0_best.pth')
+                if os.path.exists(workdirObj.path) and workdirObj.path.endswith('.pth'):
+                    copyfile(workdirObj.path, save_path)
+                    api.log(f'import model file from {workdirObj.path} , copied to {save_path}')
+                    api.alert('Pretrained model has been imported!')
+                else:
+                    api.alert('Invalid model file format (should be *.pth) ')
+            except Exception as e:
+                api.alert('Failed to load model, error: ' + str(e))
 
     async def predict(self):
         if self.dialog is not None:
             self.dialog.close()
 
         options = await api.showDialog( name="Prediction Configurations", ui= "<br>".join([
-        "Image file name { id: 'image_file_name', type:'string', placeholder: 'nuclei.png'}",
-        "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_border_mask.png'}",
+        #"Image file name { id: 'image_file_name', type:'string', placeholder: 'nuclei.png'}",
+        #"Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_border_mask.png'}",
+         "Average nuclei size { id: 'nuclei_size', type:'number', placeholder: 20}",
         ]))
         config = load_config('configs/imjoy_dpn_softmax_s2.json')
         ret = await api.showFileDialog(title="Please select a folder containing your testing data ( folder with a subfolder called `test`).", root='/imjoy/imjoy-paper/SEGMENTATION-DATA', type= 'directory', engine= api.ENGINE_URL)
@@ -302,12 +329,12 @@ class ImJoyPlugin():
         config.batch_size = 16
         config.epoch_size = 24
 
-        scale_factor = await api.prompt('What is the average nuclei size in your image in pixel?', 20)
-        scale_factor = 20.0/float(scale_factor)
+        # scale_factor = await api.prompt('What is the average nuclei size in your image in pixel?', 20)
+        scale_factor = 20.0/float(options.nuclei_size)
         api.log('using scale factor = ', scale_factor)
     
         paths, fn_mapping  = load_path_mapping(config, False)
-        model_path = os.path.join('..', 'weights', config.folder, 'fold0_best.pth') # '../weights/dpn_softmax_f0/fold0_best.pth'
+        model_path = os.path.join('..', 'weights', 'dpn_softmax_f0', 'fold0_best.pth') # '../weights/dpn_softmax_f0/fold0_best.pth'
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all'})
         await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping, model_path, self.plot_images,scale_factor)
 
@@ -345,8 +372,8 @@ class ImJoyPlugin():
         config.batch_size = 16
         config.epoch_size = 24
         paths, fn_mapping  = load_path_mapping(config, True)
-        log_path =  os.path.join('..', 'logs', config.folder, 'fold0')
-        save_path = os.path.join('..', 'weights', config.folder)
+        log_path =  os.path.join('..', 'logs', 'dpn_softmax_f0' 'fold0')
+        save_path = os.path.join('..', 'weights', 'dpn_softmax_f0')
         ret = await api.confirm('Do you want to start with pretrained model?')
         if ret:
             model_path = '../weights/dpn_softmax_f0/fold0_best.pth'
