@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "cover": "",
   "description": "Documentation for image segmentation.",
   "icon": "extension",
@@ -284,8 +284,17 @@ The **trained model** are stored as **ToDo: correct names and more info**, and c
 </attachment>
 
 <attachment name="prediction">
+<br>
+<p style="color:#FF0000"> FOR IMJOY REVIEWERS: when using the provided remote engine 'imjoy.pasteur.cloud', 
+  the pre-trained model is available at 'imjoy/imjoy-paper/SEGMENTATION-MODELS/pretrained-model-dpn-softmax/fold0_best.pth'.
+</p>
 
-For prediction, follow the following steps
+## Model for prediction
+You can already use a model that you re-trained on your own data (see section 'Training') or use
+a pre-trained model which is available <a onclick="api.utils.openUrl('https://www.dropbox.com/s/tufkbdta441qqtz/dpn_softmax_f0_fold0_best.pth?dl=0')">**here**.</a>
+To use the pre-trained model, you have to first download it and the load it into the plugin engine as described in the FAQ.
+
+## Perform prediction
 1. Press button `Predict`. 
 0. This will show a configuration dialog, where you can specify the filename of the input images, e.g. `nuclei.png`, and the target masks, e.g. `nuclei_masks.png`. 
 <figure>
@@ -296,7 +305,7 @@ For prediction, follow the following steps
 0. You will then be asked to specify the approximate size of the nuclei in the image (e.g. 200 for the provided example data).
 0. Predicted data will then be shown in a dashboard, where you can use the slider to navigate the different samples.
 <figure>
-    <img src="https://www.dropbox.com/s/a2gphxu25p8e4yl/dpnunet-prediction-dashboard.png?dl=0" width="400" class="img-responsive p-centered" alt="training-config">
+    <img src="https://www.dropbox.com/s/a2gphxu25p8e4yl/dpnunet-prediction-dashboard.png?dl=1" width="400" class="img-responsive p-centered" alt="training-config">
     <figcaption>Inspecting the prediction results.</figcaption>
 </figure>
 0. The predicted masks will be saved as `nuclei_border_mask_output.png` in each sample folder.
