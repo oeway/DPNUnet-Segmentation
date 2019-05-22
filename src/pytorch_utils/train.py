@@ -53,9 +53,9 @@ class Estimator:
         self.config = config
         self.optimizer_type = optimizer
 
-    def resume(self, checkpoint_name):
+    def resume(self, checkpoint_path):
         try:
-            checkpoint = torch.load(os.path.join(self.save_path, checkpoint_name))
+            checkpoint = torch.load(checkpoint_path)
         except FileNotFoundError:
             print("resume failed, file not found")
             return False
@@ -82,7 +82,7 @@ class Estimator:
             for param_group in self.optimizer.param_groups:
                 param_group['lr'] = self.lr
 
-        print("resumed from checkpoint {} on epoch: {}".format(os.path.join(self.save_path, checkpoint_name), self.start_epoch))
+        print("resumed from checkpoint {} on epoch: {}".format(checkpoint_path, self.start_epoch))
         return True
 
     def calculate_loss_multichannel(self, output, target, meter, training, iter_size):
@@ -236,7 +236,7 @@ class MetricsCollection:
         self.val_metrics = {}
 
 class PytorchTrain:
-    def __init__(self, estimator: Estimator, fold, callbacks=None, hard_negative_miner=None):
+    def __init__(self, estimator: Estimator, fold, callbacks=None, hard_negative_miner=None, load_from=None):
         self.fold = fold
         self.estimator = estimator
 
@@ -248,7 +248,10 @@ class PytorchTrain:
         self.metrics_collection = MetricsCollection()
         self.current_results = {}
 
-        self.estimator.resume("fold" + str(fold) + "_checkpoint.pth")
+        if load_from is not None:
+            self.estimator.resume(load_from)
+        else:
+            self.estimator.resume(os.path.join(self.save_path, "fold" + str(fold) + "_checkpoint.pth"))
         # if self.estimator.model_changed:
         #     callbacks.append(ColdStart(self.estimator.lr, 5, 30, 0.1))
 
@@ -320,7 +323,7 @@ def save_config(config, config_path):
     with open(config_path, "w") as write_file:
         json.dump(d, write_file)
 
-def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transforms=None, val_transforms=None, num_channels_changed=False, final_changed=False, cycle=False, callbacks=[]):
+def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transforms=None, val_transforms=None, num_channels_changed=False, final_changed=False, cycle=False, callbacks=[], load_from=None):
     results_dir = config.results_dir
     if results_dir is None:
         results_dir = os.path.abspath('..')
@@ -333,6 +336,8 @@ def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transform
     os.makedirs(log_dir, exist_ok=True)
 
     save_config(config, os.path.join(save_path, 'config.json'))
+
+
 
     model = models[config.network](num_classes=config.num_classes, num_channels=config.num_channels)
     estimator = Estimator(model, optimizers[config.optimizer], save_path,
@@ -357,7 +362,8 @@ def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transform
     trainer = PytorchTrain(estimator,
                            fold=fold,
                            callbacks=callbacks,
-                           hard_negative_miner=hard_neg_miner)
+                           hard_negative_miner=hard_neg_miner,
+                           load_from=load_from)
 
     train_loader = PytorchDataLoader(TrainDataset(ds, train_idx, config, transforms=transforms),
                                      batch_size=config.batch_size,

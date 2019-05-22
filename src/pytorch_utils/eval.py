@@ -82,8 +82,7 @@ def predict8tta(model, batch, sigmoid):
     return np.moveaxis(np.mean(ret, axis=0), 1, -1)
 
 
-def read_model(workdir, folder, fold):
-    model_path = os.path.join(workdir, '__model__', folder, 'fold{}_best.pth'.format(fold))
+def read_model(model_path):
     if not os.path.exists(model_path):
         raise Exception('Model not exists.')
     model = nn.DataParallel(torch.load(model_path))
@@ -109,11 +108,12 @@ class Evaluator:
         self.val_transforms = val_transforms
         os.makedirs(self.save_dir, exist_ok=True)
 
-    def predict(self, fold, val_indexes):
-        prefix = ('fold' + str(fold) + "_") if self.test else ""
+    def predict(self, model_path, val_indexes, prefix):
         val_dataset = SequentialDataset(self.ds, val_indexes, stage='test', config=self.config, transforms=self.val_transforms)
         val_dl = PytorchDataLoader(val_dataset, batch_size=self.config.predict_batch_size, num_workers=self.num_workers, drop_last=False)
-        model = read_model(self.save_dir, self.folder, fold)
+
+        model = read_model(model_path)
+
         pbar = tqdm.tqdm(val_dl, total=len(val_dl))
         for data in pbar:
             samples = data['image']
