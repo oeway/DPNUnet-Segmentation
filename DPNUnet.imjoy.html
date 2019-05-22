@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -79,6 +79,7 @@ from config import Config
 from dataset.reading_image_provider import ReadingImageProvider, CachingImageProvider, InFolderImageProvider
 from dataset.image_types import SigmoidBorderImageType, BorderImageType, PaddedImageType, PaddedSigmoidImageType
 from pytorch_utils.concrete_eval import FullImageEvaluator
+from pytorch_utils.eval import read_model, predict_batch
 from pytorch_utils.callbacks import Callback
 from augmentations.transforms import aug_victor
 from pytorch_utils.train import train
@@ -185,13 +186,12 @@ def train_bowl(dash, config, paths, fn_mapping):
     except Exception as e:
         dash.setLoading({'status_text': 'Training failed with error: ' + str(e), 'loading': False})
         api.error(str(e))
-        throw
+        raise
     finally:
         api.log('training stopped')
 
-def eval_bowl(dash, config, paths, fn_mapping):
+def eval_bowl(dash, model_path, config, paths, fn_mapping):
     asyncio.set_event_loop(loop)
-    config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', False)
     test = True
     cleanup_mac_hidden_files(config.dataset_path)
     sample_count = len(os.listdir(config.dataset_path))
@@ -208,14 +208,14 @@ def eval_bowl(dash, config, paths, fn_mapping):
     keval = FullImageEvaluator(config, ds, test=test, flips=3, step_callback=step_callback,  num_workers=num_workers, border=0)
     fold = 0
     try:
-        model_path = os.path.join(config.dataset_path, '__model__', folder, 'fold{}_best.pth'.format(fold))
         prefix = ""
+        api.alert(config.dataset_path)
         keval.predict(model_path, val_indexes, prefix)
         merge_files(keval.save_dir)
     except Exception as e:
         dash.setLoading({'status_text': 'Prediction failed with error: ' + str(e), 'loading': False})
         api.error(str(e))
-        throw
+        raise
     finally:
         api.log('prediction stopped')
 
@@ -272,23 +272,39 @@ class ImJoyPlugin():
                     'data': {}
                     })
 
+
+    async def predict_one(self):
+        predict_batch()
+
     async def predict(self):
         if self.dialog is not None:
             self.dialog.close()
 
-        options = await api.showDialog( name="Prediction Configurations", ui= "<br>".join([
-        "Image file name { id: 'image_file_name', type:'string', placeholder: 'nuclei.png'}",
-        "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_border_mask.png'}",
-        ]))
+        # options = await api.showDialog( name="Prediction Configurations", ui= "<br>".join([
+        # "Image file name { id: 'image_file_name', type:'string', placeholder: 'nuclei.png'}",
+        # "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_border_mask.png'}",
+        # ]))
+        fold = 0
+        workdirObj = await api.showFileDialog(title="Please select a folder containing your testing data ( folder with a subfolder called `test`).", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
+        if os.path.exists(os.path.join(workdirObj.path, '__model__')):
+            default_model_folder = os.path.join(workdirObj.path, '__model__')
+        else:
+            default_model_folder = '/imjoy/imjoy-paper/SEGMENTATION-MODELS'
 
-        config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', True)
-        ret = await api.showFileDialog(title="Please select a folder containing your testing data ( folder with a subfolder called `test`).", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
-        config.dataset_path = ret.path
-        config.results_dir = os.path.join(config.dataset_path, 'results')
+        pathObj = await api.showFileDialog(title="Please select a trained model for prediciton", root= default_model_folder, type="directory")
+        model_dir = pathObj.path
+        # model_path = os.path.join(config.dataset_path, '__model__', config.folder, 'fold{}_best.pth'.format(fold))
+        config, paths, fn_mapping  = load_config(os.path.join(model_dir, 'config.json'), True)
+        model_path = os.path.join(model_dir, 'fold{}_best.pth'.format(fold))
+        # config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', True)
+        
+        config.dataset_path = workdirObj.path
+        config.results_dir = workdirObj.path
         config.batch_size = 16
         config.epoch_size = 24
+        api.log(str(config))
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name=" DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
-        await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping)
+        await loop.run_in_executor(None, eval_bowl, self.dash, model_path, config, paths, fn_mapping)
 
 
         await api.showStatus('Start post-processing...')
