@@ -313,15 +313,15 @@ class PytorchTrain:
 
 
 def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transforms=None, val_transforms=None, num_channels_changed=False, final_changed=False, cycle=False, callbacks=[]):
-    result_dir = config.result_dir
-    if result_dir is None:
-        result_dir = os.path.abspath('..')
-    os.makedirs(result_dir, exist_ok=True)
+    results_dir = config.results_dir
+    if results_dir is None:
+        results_dir = os.path.abspath('..')
+    os.makedirs(results_dir, exist_ok=True)
 
-    save_path = os.path.join(result_dir, '__model__', config.folder)
+    save_path = os.path.join(results_dir, '__model__', config.folder)
     os.makedirs(save_path, exist_ok=True)
 
-    log_dir = os.path.join(result_dir, 'logs')
+    log_dir = os.path.join(results_dir, 'logs')
     os.makedirs(log_dir, exist_ok=True)
 
 
