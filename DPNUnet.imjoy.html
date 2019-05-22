@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.14",
+  "version": "0.1.18",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -47,7 +47,6 @@ if os.path.exists('/imjoy/imjoy-paper/data-science-bowl/DPNUnet-segmentation-imj
     os.chdir('/imjoy/imjoy-paper/data-science-bowl/DPNUnet-segmentation-imjoy/src')
 else:
     os.chdir('DPNUnet-Segmentation/src')
-
 if api.TAG == 'GPU':
     import GPUtil
     # Get the first available GPU
@@ -67,6 +66,7 @@ else:
     api.alert('WARNING: you are running the plugin in CPU mode, training will be slow.')
 
 import asyncio
+from imjoy import api
 from geojson_utils import masks_to_annotation, gen_mask_from_geojson
 from postprocessing import wsh
 import torch
@@ -79,7 +79,6 @@ from config import Config
 from dataset.reading_image_provider import ReadingImageProvider, CachingImageProvider, InFolderImageProvider
 from dataset.image_types import SigmoidBorderImageType, BorderImageType, PaddedImageType, PaddedSigmoidImageType
 from pytorch_utils.concrete_eval import FullImageEvaluator
-from pytorch_utils.eval import read_model, predict_batch
 from pytorch_utils.callbacks import Callback
 from augmentations.transforms import aug_victor
 from pytorch_utils.train import train
@@ -87,7 +86,7 @@ from merge_preds import merge_files
 import json
 import cv2
 from scipy.misc import imread
-import json
+
 import argparse
 
 if os.path.exists('/imjoy/imjoy-paper'):
@@ -127,23 +126,12 @@ class UpdateUI(Callback):
         api.log('epoch:'+str(self.epoch)+'/'+str(self.total_epoch) + ' '+ str(logs))
         # plot_tensors(self.dash, tensor_list, label, titles)
 
-def save_config(config, config_path):
-    d = {}
-    for k in config._fields:
-        v = getattr(config, k)
-        d[k] = v
-    with open(config_path, "w") as write_file:
-        json.dump(d, write_file)
 
-def load_config(config_path):
+def load_config(config_path, training):
     with open(config_path, 'r') as f:
         cfg = json.load(f)
-       
+        cfg['dataset_path'] = cfg['dataset_path'] + ('/train' if training else '/test')
     config = Config(**cfg)
-    return config
-
-def get_path_mapping(config, training=True):
-    config.dataset_path = config.dataset_path + ('/train' if training else '/test')
     paths = {
         'masks': '',
         'images': '',
@@ -159,14 +147,13 @@ def get_path_mapping(config, training=True):
         paths = {k: os.path.join(config.dataset_path, p) for k, p in paths.items()}
     else:
         paths = {"images": config.dataset_path}
-    return paths, fn_mapping
+    return config, paths, fn_mapping
 
 
-def train_bowl(dash, config, paths, fn_mapping):
+def train_bowl(dash, config, paths, fn_mapping, save_path, log_path):
     asyncio.set_event_loop(loop)
     dash.setLoading({'status_text': 'Loading data...', 'loading': True})
-    if api.TAG == 'GPU':
-        torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.benchmark = True
     cleanup_mac_hidden_files(config.dataset_path)
     sample_count = len(os.listdir(config.dataset_path))
     idx = list(range(sample_count))
@@ -183,19 +170,12 @@ def train_bowl(dash, config, paths, fn_mapping):
     dash.setLoading({'status_text': 'Start training...', 'loading': True})
     updateUI = UpdateUI(config.nb_epoch, dash)
     num_workers = 0 if os.name == 'nt' else 4
-    save_config(config, os.path.join(config.dataset_path, 'config.json'))
-    pretrained_model_path = os.path.join(config.dataset_path, '__model__', config.folder, "fold" + str(fold) + "_checkpoint.pth")
-    try:
-        train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=num_workers, callbacks=[updateUI], transforms=aug_victor(.97), load_from=pretrained_model_path)
-    except Exception as e:
-        dash.setLoading({'status_text': 'Training failed with error: ' + str(e), 'loading': False})
-        api.error(str(e))
-        raise
-    finally:
-        api.log('training stopped')
+    train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=num_workers, callbacks=[updateUI], save_path=save_path, log_path=log_path, transforms=aug_victor(.97))
 
-def eval_bowl(dash, model_path, config, paths, fn_mapping):
+
+def eval_bowl(dash, config, paths, fn_mapping, model_path):
     asyncio.set_event_loop(loop)
+    config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', False)
     test = True
     cleanup_mac_hidden_files(config.dataset_path)
     sample_count = len(os.listdir(config.dataset_path))
@@ -210,18 +190,10 @@ def eval_bowl(dash, model_path, config, paths, fn_mapping):
         dash.setLoading({'status_text': 'Start prediction: ' + result_dict['name'], 'loading': True})
         api.log('result saved to ' + result_dict['save_path'])
     keval = FullImageEvaluator(config, ds, test=test, flips=3, step_callback=step_callback,  num_workers=num_workers, border=0)
-    fold = 0
-    try:
-        prefix = ""
-        api.alert(config.dataset_path)
-        keval.predict(model_path, val_indexes, prefix)
-        merge_files(keval.save_dir)
-    except Exception as e:
-        dash.setLoading({'status_text': 'Prediction failed with error: ' + str(e), 'loading': False})
-        api.error(str(e))
-        raise
-    finally:
-        api.log('prediction stopped')
+    fold =  0
+    
+    keval.predict(model_path, val_indexes, ('fold' + str(fold) + "_") if test else "")
+    merge_files(keval.save_dir)
 
 
 def postprocessing(test_dir, step_callback):
@@ -239,21 +211,7 @@ def postprocessing(test_dir, step_callback):
 class ImJoyPlugin():
     def __init__(self):
         self.dialog = None
-        self.anno_win = None
     async def run(self, ctx):
-        # ret = await api.showFileDialog(root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type="directory")
-        # datasets_dir = ret.path
-        # print("datasets_dir:", datasets_dir)
-        # plugin_data = [
-        #         {'name': 'Generate masks', 'description': 'Generate masks from annotations for training.', 'callback': self.generate_masks, 'img': 'https://img.icons8.com/color/96/000000/metamorphose.png'},
-        #         {'name': 'Train with data from the engine', 'description': 'Use training data stored on a (local or remote) plugin engine.', 'callback': self.train, 'img': 'https://img.icons8.com/color/96/000000/services.png'},
-        #         {'name': 'Predict', 'description': 'Segment nuclei in images.', 'callback': self.predict, 'img': 'https://img.icons8.com/color/96/000000/double-right.png'}
-        #      ]
-        # self.anno_win = await api.createWindow(name="Annotation for DPNUnet", fullscreen=True, type="ImageAnnotator",
-        #                                        data=plugin_data,
-        #                                        config={})
-        # self.dialog = await api.showDialog(type='launchpad', data= plugin_data)
-
         self.dialog = await api.showDialog(type='launchpad', data= [
                 {'name': 'Annotate images', 'description': 'Start annotation of images.', 'callback': self.start_annotation, 'img': 'https://img.icons8.com/color/96/000000/edit.png'},
                 {'name': 'Generate masks', 'description': 'Generate masks from annotations for training.', 'callback': self.generate_masks, 'img': 'https://img.icons8.com/color/96/000000/metamorphose.png'},
@@ -276,40 +234,24 @@ class ImJoyPlugin():
                     'data': {}
                     })
 
-
-    async def predict_one(self):
-        predict_batch()
-
     async def predict(self):
         if self.dialog is not None:
             self.dialog.close()
 
-        # options = await api.showDialog( name="Prediction Configurations", ui= "<br>".join([
-        # "Image file name { id: 'image_file_name', type:'string', placeholder: 'nuclei.png'}",
-        # "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_border_mask.png'}",
-        # ]))
-        fold = 0
-        workdirObj = await api.showFileDialog(title="Please select a folder containing your testing data ( folder with a subfolder called `test`).", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
-        if os.path.exists(os.path.join(workdirObj.path, '__model__')):
-            default_model_folder = os.path.join(workdirObj.path, '__model__')
-        else:
-            default_model_folder = '/imjoy/imjoy-paper/SEGMENTATION-MODELS'
+        options = await api.showDialog( name="Prediction Configurations", ui= "<br>".join([
+        "Image file name { id: 'image_file_name', type:'string', placeholder: 'nuclei.png'}",
+        "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_border_mask.png'}",
+        ]))
 
-        pathObj = await api.showFileDialog(title="Please select a trained model for prediciton", root= default_model_folder, type="directory")
-        model_dir = pathObj.path
-        config = load_config(os.path.join(model_dir, 'config.json'))
-        model_path = os.path.join(model_dir, 'fold{}_best.pth'.format(fold))
-        # config = load_config('configs/imjoy_dpn_softmax_s2.json')
-        
-        config.dataset_path = workdirObj.path
-        config.results_dir = workdirObj.path
+        config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', True)
+        ret = await api.showFileDialog(title="Please select a folder containing your testing data ( folder with a subfolder called `test`).", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
+        config.dataset_path = ret.path
+        config.results_dir = os.path.join(config.dataset_path, 'results')
         config.batch_size = 16
         config.epoch_size = 24
-        paths, fn_mapping  = get_path_mapping(config, training=False)
-        api.log('config: '+str(config))
-        
+        model_path = os.path.join('..', 'weights', config.folder, 'fold0_best.pth') # '../weights/dpn_softmax_f0/fold0_best.pth'
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name=" DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
-        await loop.run_in_executor(None, eval_bowl, self.dash, model_path, config, paths, fn_mapping)
+        await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping, model_path)
 
 
         await api.showStatus('Start post-processing...')
@@ -321,7 +263,7 @@ class ImJoyPlugin():
                 api.showProgress(step/total*100)
                 api.showStatus(f'Processing {step}/{total}: {name}')
 
-        postprocessing(config.dataset_path, callback)
+        postprocessing(os.path.join(config.dataset_path, 'test'), callback)
 
         await api.showProgress(100)
         api.alert(f'Prediction done, generated masks saved to {config.dataset_path}')
@@ -337,32 +279,27 @@ class ImJoyPlugin():
         "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_boarder_mask.png'}",
         ]))
 
-        config = load_config('configs/imjoy_dpn_softmax.json')
-        ret = await api.showFileDialog(title="Please select a folder containing the training and testing data as subfolders ‘train’ and ‘test.", root='/imjoy/imjoy-paper/SEGMENTATION-DATA', type= 'directory', engine= api.ENGINE_URL)
+        config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax.json', True)
+        ret = await api.showFileDialog(title="Please select a folder containing the training and testing data as subfolders ‘train’ and ‘test.", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
         config.dataset_path = ret.path
-        config.results_dir = config.dataset_path
+        config.results_dir = os.path.join(config.dataset_path, 'results')
         config.nb_epoch = options.epochs
         config.batch_size = 16
         config.epoch_size = 24
-        paths, fn_mapping  = get_path_mapping(config, training=True)
-        api.log('config: '+str(config))
+        log_path =  os.path.join('..', 'logs', config.folder, 'fold{}'.format(fold))
+        save_path = os.path.join('..', 'weights', config.folder)
+        api.log(f'model will be saved to {save_path}')
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Training DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
-        try:
-            await loop.run_in_executor(None, train_bowl, self.dash, config, paths, fn_mapping)
-        except Exception as e:
-            api.error(str(e))
-            api.alert('Failed to start training, error: ' + str(e))
-        else:
-            api.alert(f'Training finished.')
+        await loop.run_in_executor(None, train_bowl, self.dash, config, paths, fn_mapping, save_path, log_path)
 
-    async def generate_masks(self, datasets_dir=None):
+        api.alert(f'Training finished, model saved to {save_path}')
+
+    async def generate_masks(self):
         if self.dialog is not None:
             self.dialog.close()
-        if datasets_dir is None:
-            ret = await api.showFileDialog(root='/imjoy/imjoy-paper/SEGMENTATION-DATA', type="directory")
-            datasets_dir = ret.path
-            print("datasets_dir:", datasets_dir)
-    
+        ret = await api.showFileDialog(root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type="directory")
+        datasets_dir = ret.path
+        print("datasets_dir:", datasets_dir)
         file_ids = os.listdir(os.path.join(datasets_dir, "train"))
         total = len(file_ids)
         for i, file_id in enumerate(file_ids):
@@ -376,64 +313,14 @@ class ImJoyPlugin():
         await api.showProgress(100)
         await api.alert('Finished, generated masks saved to ' + datasets_dir)
 
-    async def start_train(self, config):
-        api.alert('training:'+str(config))
-        api.log('dataset' + str(config.dataset))
-        api.log('current sample' + str(config.current_sample))
-
-    async def run_prediction(self, config):
-        api.alert('prediction:'+str(config))
-
-        api.log('dataset' + str(config.dataset))
-        api.log('current sample' + str(config.current_sample))
 
     async def start_annotation(self):
         if self.dialog is not None:
             self.dialog.close()
-        annotator_config = {
-            'dataset': {
-                "api_version": "0.1.6",
-                "root_folder": "./datasets/kaggle_data",
-                "name": "kaggle_data",
-                "channel_config": {
-                    "nuclei": {
-                        "filter": "nuclei.",
-                        "name": "nuclei"
-                    }
-                },
-                "source": "engine",
-                "engine_url": "https://127.0.0.1:2957"
-            },
-            'actions': [
-                {'name': 'Generate Masks', 'callback': self.generate_masks,
-                 'tooltip': 'Generate border masks from the annotation'},
-                {'name': 'Start Training', 'callback': self.start_train,
-                 'tooltip': 'Start training on this dataset.'},
-                {'name': 'Run Prediction', 'callback': self.run_prediction,
-                 'tooltip': 'Run Prediction on this dataset.'},
-            ]
-        }
-
-        await api.createWindow(name="Annotation for DPNUnet", fullscreen=True, type="ImageAnnotator",
-                               data=annotator_config, config={})
+        await api.createWindow(name="Annotation for DPNUnet", fullscreen=True, type="ImageAnnotator", data={}, config={})
 
     def setup(self):
         api.log('initialized')
-        api.register(name="generate_masks_test", run=self.generate_masks_test, ui="generate_masks_test")
-        api.register(name="train_test", run=self.train_test, ui="train_test")
-        api.register(name="predict_test", run=self.predict_test, ui="predict_test")
-
-    async def generate_masks_test(self, my=None):
-        ret = await api.showFileDialog(root=os.getcwd(), type="directory")
-        datasets_dir = ret.path
-        print("datasets_dir:", datasets_dir)
-        await self.generate_masks(datasets_dir)
-
-    async def train_test(self, my=None):
-        await self.train()
-
-    async def predict_test(self, my=None):
-        await self.predict()
 
 api.export(ImJoyPlugin())
 </script>
