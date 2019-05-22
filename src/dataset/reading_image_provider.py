@@ -26,7 +26,7 @@ class ReadingImageProvider(AbstractImageProvider):
 
 
 class CachingImageProvider(ReadingImageProvider):
-    def __init__(self, image_type, paths, fn_mapping=lambda name: name, image_suffix=None, has_alpha=False, scale_factor=scale_factor):
+    def __init__(self, image_type, paths, fn_mapping=lambda name: name, image_suffix=None, has_alpha=False, scale_factor=1.0):
         super().__init__(image_type, paths, fn_mapping, image_suffix, has_alpha=has_alpha, scale_factor=scale_factor)
         self.cache = {}
 
@@ -37,7 +37,7 @@ class CachingImageProvider(ReadingImageProvider):
         return self.cache[item]
 
 class InFolderImageProvider(ReadingImageProvider):
-    def __init__(self, image_type, paths, fn_mapping=lambda name: name, image_suffix=None, has_alpha=False, scale_factor=scale_factor):
+    def __init__(self, image_type, paths, fn_mapping=lambda name: name, image_suffix=None, has_alpha=False, scale_factor=1.0):
         super().__init__(image_type, paths, fn_mapping, image_suffix, has_alpha, scale_factor=scale_factor)
 
     def __getitem__(self, item):
