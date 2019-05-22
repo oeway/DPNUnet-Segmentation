@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -98,6 +98,22 @@ else:
 
 loop = asyncio.get_event_loop()
 
+
+async def plot_tensors(dash, tensor_list, label, titles=None):
+    image_list = [tensor.detach().cpu().numpy().reshape(tensor.shape[-2], tensor.shape[-1]) for tensor in tensor_list]
+    displays = {}
+    titles = titles or [ 'Tensor '+str(i) for i in range(len(image_list))]
+    for i in range(len(image_list)):
+        im = image_list[i]
+        min = im.min()
+        im = Image.fromarray(((im-min)/(im.max()-min)*255).astype('uint8'))
+        buffered = BytesIO()
+        im.save(buffered, format="JPEG")
+        img_str = base64.b64encode(buffered.getvalue()).decode('ascii')
+        imgurl = 'data:image/png;base64,' + img_str
+        displays[titles[i]] = imgurl
+    await dash.appendDisplay(label, displays)
+    
 class UpdateUI(Callback):
     def __init__(self, total_epoch, dash):
         self.total_epoch = total_epoch
@@ -105,6 +121,7 @@ class UpdateUI(Callback):
         self.logs = {}
         self.dash = dash
         self.step = 0
+
 
     def on_batch_end(self, batch):
         if batch % 10 == 0:
@@ -125,7 +142,8 @@ class UpdateUI(Callback):
         api.showProgress(self.epoch/self.total_epoch*100)
         api.showStatus('training epoch:'+str(self.epoch)+'/'+str(self.total_epoch))
         api.log('epoch:'+str(self.epoch)+'/'+str(self.total_epoch) + ' '+ str(logs))
-        # plot_tensors(self.dash, tensor_list, label, titles)
+        #current_results['inputs': images, 'outputs': ypreds, 'target': ytrues]
+        #plot_tensors(self.dash, tensor_list, label, titles)
 
 
 def load_config(config_path, training):
@@ -151,7 +169,7 @@ def load_config(config_path, training):
     return config, paths, fn_mapping
 
 
-def train_bowl(dash, config, paths, fn_mapping, save_path, log_path):
+def train_bowl(dash, config, paths, fn_mapping, save_path, log_path, model_path):
     asyncio.set_event_loop(loop)
     dash.setLoading({'status_text': 'Loading data...', 'loading': True})
     torch.backends.cudnn.benchmark = True
@@ -171,12 +189,20 @@ def train_bowl(dash, config, paths, fn_mapping, save_path, log_path):
     dash.setLoading({'status_text': 'Start training...', 'loading': True})
     updateUI = UpdateUI(config.nb_epoch, dash)
     num_workers = 0 if os.name == 'nt' else 4
-    train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=num_workers, callbacks=[updateUI], save_path=save_path, log_path=log_path, transforms=aug_victor(.97))
-
+    try:
+        if model_path is not None:
+            model = torch.load(model_path)
+            api.log('loaded model from ' + model_path)
+        train(ds, val_ds, fold, train_idx, val_idx, config, model=model, num_workers=num_workers, callbacks=[updateUI], save_path=save_path, log_path=log_path, transforms=aug_victor(.97))
+    except:
+        api.alert('Failed to train model')
+        raise
+    finally:
+        dash.setLoading({'status_text': 'Training Stopped', 'loading': False})
 
 def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images):
     asyncio.set_event_loop(loop)
-    config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', False)
+    #config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', False)
     test = True
     cleanup_mac_hidden_files(config.dataset_path)
     sample_count = len(os.listdir(config.dataset_path))
@@ -255,20 +281,7 @@ class ImJoyPlugin():
         except Exception as e:
             api.log('error: '+str(e))
     
-    async def plot_tensors(self, tensor_list, label, titles=None):
-        image_list = [tensor.detach().cpu().numpy().reshape(tensor.shape[-2], tensor.shape[-1]) for tensor in tensor_list]
-        displays = {}
-        titles = titles or [ 'Tensor '+str(i) for i in range(len(image_list))]
-        for i in range(len(image_list)):
-            im = image_list[i]
-            min = im.min()
-            im = Image.fromarray(((im-min)/(im.max()-min)*255).astype('uint8'))
-            buffered = BytesIO()
-            im.save(buffered, format="JPEG")
-            img_str = base64.b64encode(buffered.getvalue()).decode('ascii')
-            imgurl = 'data:image/png;base64,' + img_str
-            displays[titles[i]] = imgurl
-        await self.dash.appendDisplay(label, displays)
+
 
     async def predict(self):
         if self.dialog is not None:
@@ -324,9 +337,14 @@ class ImJoyPlugin():
         config.epoch_size = 24
         log_path =  os.path.join('..', 'logs', config.folder, 'fold0')
         save_path = os.path.join('..', 'weights', config.folder)
+        ret = await api.confirm('Do you want to start with pretrained model?')
+        if ret:
+            model_path = '../weights/dpn_softmax_f0/fold0_best.pth'
+        else:
+            model_path = None
         api.log(f'model will be saved to {save_path}')
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Training DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
-        await loop.run_in_executor(None, train_bowl, self.dash, config, paths, fn_mapping, save_path, log_path)
+        await loop.run_in_executor(None, train_bowl, self.dash, config, paths, fn_mapping, save_path, log_path, model_path)
 
         api.alert(f'Training finished, model saved to {save_path}')
 
