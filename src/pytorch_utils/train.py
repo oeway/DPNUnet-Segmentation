@@ -205,6 +205,7 @@ class Estimator:
         targets = ytrues.chunk(iter_size)
 
         meter = defaultdict(float)
+        outputs = []
         for input, target in zip(inputs, targets):
             input = torch.autograd.Variable(input.cuda(async=True), volatile=not training)
             target = torch.autograd.Variable(target.cuda(async=True), volatile=not training)
@@ -218,13 +219,12 @@ class Estimator:
             # for name, func in metrics:
             #     acc = func(output.contiguous(), target.contiguous())
             #     meter[name] += acc.data.cpu().numpy()[0] / iter_size
-
-            # outputs.append(output.data)
+            outputs.append(output.data)
 
         if training:
             torch.nn.utils.clip_grad_norm(self.model.parameters(), 1.)
             self.optimizer.step()
-        return meter, None#torch.cat(outputs, dim=0)
+        return meter, torch.cat(outputs, dim=0)
 
 class MetricsCollection:
     def __init__(self):
