@@ -10,6 +10,7 @@ from torch.optim.lr_scheduler import ExponentialLR
 from torch.utils.data.dataloader import DataLoader as PytorchDataLoader
 from tqdm import tqdm
 from typing import Type
+import json
 
 from dataset.neural_dataset import TrainDataset, ValDataset
 from .loss import dice_round, dice_loss, multi_class_dice, multi_class_dice_round, jaccard, jaccard_round
@@ -311,6 +312,13 @@ class PytorchTrain:
 
         self.callbacks.on_train_end()
 
+def save_config(config, config_path):
+    d = {}
+    for k in config._fields:
+        v = getattr(config, k)
+        d[k] = v
+    with open(config_path, "w") as write_file:
+        json.dump(d, write_file)
 
 def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transforms=None, val_transforms=None, num_channels_changed=False, final_changed=False, cycle=False, callbacks=[]):
     results_dir = config.results_dir
@@ -324,6 +332,7 @@ def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transform
     log_dir = os.path.join(results_dir, 'logs')
     os.makedirs(log_dir, exist_ok=True)
 
+    save_config(config, save_path)
 
     model = models[config.network](num_classes=config.num_classes, num_channels=config.num_channels)
     estimator = Estimator(model, optimizers[config.optimizer], save_path,
