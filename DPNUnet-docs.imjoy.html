@@ -1,4 +1,4 @@
-﻿<docs lang="markdown">
+<docs lang="markdown">
 [TODO: write documentation for this plugin.]
 </docs>
 
@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "cover": "",
   "description": "Documentation for image segmentation.",
   "icon": "extension",
@@ -39,7 +39,7 @@
     <figcaption>Nuclei segmentation: DAPI (left), segmented nuclei (right).</figcaption>
 </figure>
 
-The segmentation itself is perform largely by the winning approach (DPNUnet) of the 2018 Kaggle Data Science Bowl.
+The segmentation is perform by the winning approach (DPNUnet) of the 2018 Kaggle Data Science Bowl.
 
 * **Description of DPNUnet**: <a onclick="api.utils.openUrl('https://www.kaggle.com/c/data-science-bowl-2018/discussion/54741')">https://www.kaggle.com/c/data-science-bowl-2018/discussion/54741</a>,
 Nature Methods, 2018
@@ -78,7 +78,7 @@ connected into a large mesh network.
 Importantly, such a network has to be trained before prediction can be performed. 
 
 <figure>
-    <img src="https://www.dropbox.com/s/hbg3c23gwfedu0p/neural_network.png?dl=1" width="300" class="img-responsive p-centered" alt="anna-palm-reconstruction">
+    <img src="https://www.dropbox.com/s/hbg3c23gwfedu0p/dpnunet-neural_network.png?dl=1" width="280" class="img-responsive p-centered" alt="anna-palm-reconstruction">
     <figcaption>Basic structure of a neural network.</figcaption>
 </figure>
 
@@ -100,7 +100,7 @@ anymore to new data (**overfitting**). Good training finds the sweet spot betwee
 extreme cases. 
 
 <figure>
-    <img src="https://www.dropbox.com/s/inlro9emd2yk1y6/training_validation.png?dl=1" width="400" class="img-responsive p-centered" alt="anna-palm-reconstruction">
+    <img src="https://www.dropbox.com/s/inlro9emd2yk1y6/dpnunet-training_validation.png?dl=1" width="400" class="img-responsive p-centered" alt="anna-palm-reconstruction">
     <figcaption>Training and validation loss during training.</figcaption>
 </figure>
  
@@ -116,25 +116,30 @@ model is used as the starting point to perform training on the new data.
 
 <attachment name="data">
 <br>
+<p style="color:#FF0000"> FOR IMJOY REVIEWERS: when using the provided remote engine 'imjoy.pasteur.cloud', 
+  you have training data already available at 'imjoy/imjoy-paper/SEGMENTATION-DATA/HeLa_DAPI_v1'. 
+</p>
+<br>
 <p id="data-requirements">
 Here we describe how the training images have to be provided: image format, naming scheme, and data organization. 
 </p>
 
+Annotated training data with DAPI stained HeLa cells is available <a onclick="api.utils.openUrl('https://www.dropbox.com/sh/25zv7itq6kfjaje/AABp2npWGuzEQNGuHu7DddD2a?dl=0')">**here**.</a>
+
 ## Data organization for training
 
-Training data has to be organized with the following folder structure:
-* Traing and validation data has to be stored in two folders **train** and **test**, respectively. 
+Training data has to be organized with the following **folder structure**:
+* Traing and validation data has to be stored in two folders 'train' and 'test', respectively. 
 * Each sample (e.g. a field of view) is stored in a separate subfolder with a unique name.
 
-Images have to be provided as follows:
+Images have to be provided in the following **format**:
 * **Filenames have to be identical** across these subfolders, e.g. `nuclei.png`
 * Image have to be **2D**. 3D images have to be converted to 2D, e.g. with a maximum intensity projection. 
 * Images are stored as **RGB PNGs**.
 
-We then provide plugins to annotate images and create masks:
-* **Annotations** can be created with a dedicated plugin resulting in file `annotation.json` within each subfolder. More details
-are provided in the dedicated section. 
-* The network will learn to predict different mask types (`nuclei_masks.png`), which can be created with a dedicated plugin. 
+We then provide plugins to annotate images ('`annotation.json`) and create masks (`nuclei_border_mask.png`). More 
+details can be found in the dedicate section. The network will then learn to predict these masks from 
+the input images.  
 
 This will result in the following folder structure
 ```
@@ -143,86 +148,89 @@ This will result in the following folder structure
 │  │  ├─ img1
 │  │  │  ├─ annotation.json
 │  │  │  ├─ nuclei.png
-│  │  │  ├─ nuclei_masks.png
+│  │  │  ├─ nuclei_border_mask.png
 │  │  ├─ img2
 │  │  │  ├─ annotation.json
 │  │  │  ├─ nuclei.png
-│  │  │  ├─ nuclei_masks.png
+│  │  │  ├─ nuclei_border_mask.png
 │  │  ...
 │  ├─ test/
 │  │  ├─ img57
 │  │  │  ├─ annotation.json
 │  │  │  ├─ nuclei.png
-│  │  │  ├─ nuclei_masks.png
+│  │  │  ├─ nuclei_border_mask.png
 │  │  ├─ img58
 │  │  │  ├─ annotation.json
 │  │  │  ├─ nuclei.png
-│  │  │  ├─ nuclei_masks.png
+│  │  │  ├─ nuclei_border_mask.png
 │  │   ...
 ```
 
-https://www.dropbox.com/sh/8pfim9t21rrheni/AAB-x4Gk44FrSu1_6k9TXCQwa?dl=0
-
 ## Data for prediction
-
 **ToDo**
 </attachment>
 
 <attachment name="annotation">
 <br>
+<p style="color:#FF0000"> FOR IMJOY REVIEWERS: when using the provided remote engine 'imjoy.pasteur.cloud', 
+  annotated training data is already available at 'imjoy/imjoy-paper/SEGMENTATION-DATA/HeLa_DAPI_v1'. You can
+  open these data in the Annotator to inspect the annotations, or directly create masks as described below.
+</p>
+<br>
 <p id="annotation">
-This plugin allows to annote the structures of interest, i.e. nuclei. 
-The plugin was designed to read the above describe folder structure, i.e. opening the
-folder `data_for_training` will allow to annotate all contained images. 
+This plugin allows to annote the nuclei in the images. The plugin was designed to read the 
+above describe folder structure, i.e. opening the folder `data_for_training` will allow to 
+annotate all contained images. 
 </p>
 
-## Load data on plugin engine
-1. Prepare training data as specified in the section 'Data'.
-2. You can drag and drop the folder containing the subfolder 'train' and 'test'  to the plugin engine. 
-3. In ImJOy, press `Files`, and `Open Engine File`.
-4. If ImJoy is connected to multiple plugin engines, select the one where the segmentation plugin is running on.
-5. Navigate to the folder where you want to load your data. 
-5. Drag & drop the folder containing the training data into this folder.
+
+## Annotator plugin
+This plugin allows to annotate different structures of interests in mult-channel images.
+You can load an entire data-set containing files in subfolders into the Annotator and annotate these files.
+Annotations are stored in geojson format and can be either be loaded on a plugin engine for mask 
+generation and training, or retrieved for later use. 
+
+If you want to familiarize yourself with the Annotoation tool, you can simply start it by pressing `Annotations`.
+It will open with a default image, and you can already familiarize yourself with some of the features
+* Zooming and panning.
+* Change contrast
+* Show multiple channels as an overlay
+* Annotate different structurs, and toggle display of certain annotations.
+
+<figure>
+    <img src="https://www.dropbox.com/s/71ujzlf8rfzw7t8/dpnunet-annotation.png?dl=1" width="500" class="img-responsive p-centered" alt="segmentation-launchpad">
+    <figcaption>Image annotation in ImJoy.</figcaption>
+</figure>
 
 ## Import your images into Annotator plugin
-When starting the plugin, it will show a default image. If you want to familiarize yourself
-with the annotation features, you can already play around with this image.
+1. Prepare training data as specified in the section 'Data'.
+0. These data, i.e. the folder containing the subfolder 'train' and 'test', then have to copied 
+  to plugin engine, where the segmentation plugin is running. See FAQ for more details for how to load data on an engine. 
+0. To read the data into the Annotator, follow these steps
+      1.  Press on the `File` dropdown menu in the upper right corner of the ImJoy interface and select `Import Samples`.
+      0.  This will open a file import dialog. In the upper left corner select `Select Plugin Files` and select
+          the folder with the training data.
+      0.  This will populate the interface with all files in the folder. An icon 
+          is shown for each present file, hoovering over this icon will display its name.
+      0.  You then have to set a **filter on the file-name** to determine which image(s) 
+          will be read into the Annotator. For this you set a name for the channel,
+          e.g. `nuclei`, and the identifier of this image, e.g. `nuclei.png`. Note that 
+          pressing on an icon of file, will populate the filter fields with a suggestion, which can 
+          be modified further. Press `Add Channel` to add this channel. You then see this 
+          channel as an additional column in the interface, and for each channel if such a file was found.
+      0.  Press `Import` to open the Annotator with the specified files.
 
-In order to load your own data, you have to 
-1.  Press on the `File` dropdown menu in the upper right corner
-2.  Select `Import Samples`
-3.  In the new dialog press `Choose Files` and then `Select Plugin Files`
-4.  In the dialog, select the folder with the training data.
-5.  ImJoy will display a dialog saying "This will upload ....", confirm. Your
-    data **only be "uploaded" to your local browser** but not on an external website.
-6.  This will populate the interface with all files in your folder. For each folder,
-7.  you see a little icon representing a file being present in the folder. Hoovering over 
-    the icon will display its name.
-8.  You then have to set a filter on the file-name for the channel which will
-    be read into the Annotator plugin. For this you set a name for the channel,
-    e.g. `nuclei`, and the identifier of this image, e.g. `nuclei.ong`. Pressing on 
-    the icon of file, will populate the filter fields with a suggestion, which can 
-    be modified further. Press `Add Channel` to add this channel. You then see this 
-    channel as an additional column in the interface. 
-8.  Press `Import` to open the Annotator with the specified files.
+<figure>
+    <img src="https://www.dropbox.com/s/tket24vfukarmzn/dpnunet-annotator-load-data.gif?dl=1" class="img-responsive p-centered" alt="segmentation-launchpad">
+    <figcaption>Image annotation in ImJoy.</figcaption>
+</figure>
 
 ## Annotate structure of interest
 You can then specify your annotation: 
 1. From the `Annotation` dropdown menu, you can specify which annotations type you want to
   outline. 
 2. By pressing `New Marker` you can specify an new annotation type. You can define
-  its name, the color in which it will show, and what outline type.
-
-**ToDo update screeenshot to show segmentation **
-<img src="https://www.dropbox.com/s/7x6ro3ldckv7cvb/screenshot-annotation.png?dl=1" width="500" class="img-responsive ..." alt="...">
-     
-## Navigate your image
-To faciliate the annotation, you can
-* Zoom
-* Pan (with the mouse button pressed)
-* Change contrast
-* Show multiple channels as an overlay
-* Display other annotation types.
+  its name, the color in which it will show, and what outline type ('polygon' for nuclei).
 
 ## Export annotations
 Once you are done, you can export the annotations from the `Exports` dropdown menu
@@ -231,33 +239,36 @@ and selecting
 **ToDo update to give more details**
 
 ## Generate masks
-Once your images are annotated, you can generate masks that will be predicted by the network and used 
-to segment the nuclei. Two mask types are used in DPNUnet: filled and border.
+The DPNUnet learns to predict two mask from the input image: a filled mask, and a mask for areas where nuclei touch (so called 'border')
+You can generate these masks from the annotated data by pressing `Generate Masks` and select the folder containing the annotated data.  
+The masks will be stored as `nuclei_border_mask.png` for each annotated image. 
 
 <div class="container">
   <div class="columns">
-    <div class="column col-xs-6">Filled mask<img src="https://www.dropbox.com/s/ggrwbrqvpboy9pf/cells__MASK_fill.png?dl=1" class="img-responsive ..." alt="...">
+    <div class="column col-xs-4">Annotation<img src="https://www.dropbox.com/s/9ayhcbpevzv757b/dpnunet-nuclei-annotation.png?dl=1" class="img-responsive ..." alt="...">
  </div>
-    <div class="column col-xs-6"> Border mask   <img src="https://www.dropbox.com/s/qdn85oj6zlwxthw/cells__MASK_edgeWeight.png?dl=1" class="img-responsive ..." alt="...">
+  <div class="column col-xs-4"> Filled mask <img src="https://www.dropbox.com/s/ggrwbrqvpboy9pf/dpnunet-nuclei-mask-fill.png?dl=1" class="img-responsive ..." alt="...">
+  </div>
+    <div class="column col-xs-4"> Border mask <img src="https://www.dropbox.com/s/z2mkpyw2mgi9ffx/dpnunet-nuclei-mask-border.png?dl=1" class="img-responsive ..." alt="...">
   </div>
 </div>
 
-When pressing the button `Generate Masks`, a dialog pops up where you can specify the folder containing your annotated 
-training and validation data. Masks will then be generated for all annotations and stored as PNG file named `nuclei_masks.png`
 </attachment>
 
 <attachment name="training">
-<br>
-<p id="training">
-Here you can re-train the pre-trained DPNUnet model on your own data. 
+ <br>
+<p style="color:#FF0000"> FOR IMJOY REVIEWERS: when using the provided remote engine 'imjoy.pasteur.cloud', 
+  annotated training data with masks is  available at 'imjoy/imjoy-paper/SEGMENTATION-DATA/HeLa_DAPI_v1'. 
+  You can use these data to perform training.  
 </p>
+<br>
 
-In order to re-train you have to 
+Here you can re-train the pre-trained DPNUnet model on your own data by following these steps
 1. Press button 'Train with data from engine'
-2. This will show a configuration dialog, where you can specify the filename of the input images, e.g. `nuclei.png`, and the target masks, e.g. `nuclei_masks.png`. 
+2. This will show a configuration dialog, where you can specify the filename of the input images, e.g. `nuclei.png`, and the target masks, e.g. `nuclei_border_mask.png`. 
  Further you can specify for how many epochs the network will train, and under which name the model will be saved.
 <figure>
-    <img src="https://www.dropbox.com/s/f0wqnjs67jriabt/dpnunet-training-config.PNG?dl=1" width="400" class="img-responsive p-centered" alt="training-config">
+    <img src="https://www.dropbox.com/s/f0wqnjs67jriabt/dpnunet-training-config.PNG?dl=1" width="300" class="img-responsive p-centered" alt="training-config">
     <figcaption>Training and validation loss during training.</figcaption>
 </figure>
 3. Specify the training data, i.e. the folder containing subfolders 'train' and 'valid'.
@@ -268,8 +279,7 @@ In order to re-train you have to
     <figcaption>Monitoring training progress with the dashboard.</figcaption>
 </figure>
 
-
-The **trained model ** are stored as **ToDo: correct names and more info**, and can then be used for prediction.
+The **trained model** are stored as **ToDo: correct names and more info**, and can then be used for prediction.
 
 </attachment>
 
@@ -282,12 +292,30 @@ For prediction, you have
     <img src="https://www.dropbox.com/s/f0wqnjs67jriabt/dpnunet-predict-config.PNG?dl=1" width="400" class="img-responsive p-centered" alt="training-config">
     <figcaption>Training and validation loss during training.</figcaption>
 </figure>
-3. Select a folder containg a subfolder testing.
+3. Select a folder containig a subfolder testing.
 
 
-WHich model is used?
+Which model is used?
 How does test data have to be organized? also in individual folders?
 </attachment>
+
+<attachment name="faq">
+Here we provide answer to frequenty asked questions and encountered problems.
+
+## How can I load data or a model into the plugin engine?
+You can simply drag and drop a folder containing either training data or model:
+1. In ImJoy, press `Files`, and `Open Engine File`.
+2. If ImJoy is connected to multiple plugin engines, select the one where the segmentation plugin is running in the upper part of the interface.
+3. Navigate to the folder where you want to store your data. 
+4. Drag & drop the folder from Finder (MacOS) or Explorer (WIN) into the ImJoy file dialog.
+
+<figure>
+    <img src="https://www.dropbox.com/s/oqofqh7fbnjgb0v/dpnunet-upload.gif?dl=1" width="700" class="img-responsive p-centered" alt="load-model-into-engine">
+    <figcaption>Load data on a plugin engine.</figcaption>
+</figure>
+
+</attachment>
+
 <script lang="javascript">
 class ImJoyPlugin {
   async setup() {
@@ -327,6 +355,8 @@ class ImJoyPlugin {
       marked(await api.getAttachment('training')); 
       document.getElementById('cont_prediction').innerHTML =
       marked(await api.getAttachment('prediction')); 
+      document.getElementById('cont_faq').innerHTML =
+      marked(await api.getAttachment('faq')); 
       try {
         console.log(ctx.data.tab, ctx.data.section)
         this.app.focus(ctx.data.tab, ctx.data.section)
@@ -362,6 +392,9 @@ api.export(new ImJoyPlugin())
       <li class="tab-item" v-bind:class="{ active: active_tab=='prediction' }">
         <a href="#" @click="active_tab='prediction'">Prediction</a>
       </li>
+      <li class="tab-item" v-bind:class="{ active: active_tab=='faq' }">
+        <a href="#" @click="active_tab='faq'">FAQ</a>
+      </li>
     </ul>
 
    <!-- This can eventually be replaced by a better organization, e.g. tabs -->
@@ -371,7 +404,7 @@ api.export(new ImJoyPlugin())
    <div v-show="active_tab=='annotation'" class="tab-content" id="cont_annotation"></div>
    <div v-show="active_tab=='training'" class="tab-content" id="cont_training"></div>
    <div v-show="active_tab=='prediction'" class="tab-content" id="cont_prediction"></div>
-
+   <div v-show="active_tab=='faq'" class="tab-content" id="cont_faq"></div>
   </div>
 </window>
 
