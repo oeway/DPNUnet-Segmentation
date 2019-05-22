@@ -52,7 +52,7 @@ def gen_mask_from_geojson(files_proc, masks_to_create_value=['filled', 'edge', '
 
     weightedEdgeMasks = annotationUtils.WeightedEdgeMaskGenerator(sigma=8, w0=10)
     distMapMasks = annotationUtils.DistanceMapGenerator(truncate_distance=None)
-    borderMasks = annotationUtils.borderMaskGenerator()
+    borderMasks = annotationUtils.BorderMaskGenerator()
 
     # %% Loop over all files
     for i, file_proc in enumerate(files_proc):
@@ -165,12 +165,16 @@ if __name__ == "__main__":
 
     # generate mask from annotation.josn
     datasets_dir = "/home/alex/Downloads/test/data/kaggle_data"
+    err_list = []
     for file_id in os.listdir(os.path.join(datasets_dir, "train")):
         file_path = os.path.join(datasets_dir, "train", file_id, "annotation.json")
+        # gen_mask_from_geojson([file_path], masks_to_create_value=["border_mask"])
         try:
             gen_mask_from_geojson([file_path], masks_to_create_value=["border_mask"])
         except:
             print("generate mask error:", os.path.join(datasets_dir, "train", file_id))
+            err_list.append(file_id)
+    print("err_list:", err_list)
 
     # # change the mask file name
     # for file_id in os.listdir(os.path.join(datasets_dir, "train")):
