@@ -52,7 +52,7 @@ def gen_mask_from_geojson(files_proc, masks_to_create_value=['filled', 'edge', '
 
     weightedEdgeMasks = annotationUtils.WeightedEdgeMaskGenerator(sigma=8, w0=10)
     distMapMasks = annotationUtils.DistanceMapGenerator(truncate_distance=None)
-    borderMasks = annotationUtils.borderMaskGenerator()
+    borderMasks = annotationUtils.BorderMaskGenerator()
 
     # %% Loop over all files
     for i, file_proc in enumerate(files_proc):
