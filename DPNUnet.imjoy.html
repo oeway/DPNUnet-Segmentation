@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": [],
   "ui": "",
@@ -188,6 +188,7 @@ def postprocessing(test_dir, step_callback):
 class ImJoyPlugin():
     def __init__(self):
         self.dialog = None
+
     async def run(self, ctx):
         self.dialog = await api.showDialog(type='launchpad', data= [
                 {'name': 'Annotate images', 'description': 'Start annotation of images.', 'callback': self.start_annotation, 'img': 'https://img.icons8.com/color/96/000000/edit.png'},
@@ -289,11 +290,43 @@ class ImJoyPlugin():
         await api.showProgress(100)
         await api.alert('Finished, generated masks saved to ' + datasets_dir)
 
+    async def start_training(self, config):
+        api.alert('training:'+str(config))
+        api.log('dataset' + str(config.dataset))
+        api.log('current sample' + str(config.current_sample))
+
+    async def run_prediction(self, config):
+        api.alert('prediction:'+str(config))
+
+        api.log('dataset' + str(config.dataset))
+        api.log('current sample' + str(config.current_sample))
 
     async def start_annotation(self):
         if self.dialog is not None:
             self.dialog.close()
-        await api.createWindow(name="Annotation for DPNUnet", fullscreen=True, type="ImageAnnotator", data={}, config={})
+    
+        annotator_config = {
+            'dataset': {
+                "api_version": "0.1.6",
+                "root_folder": "./datasets/kaggle_data",
+                "name": "kaggle_data",
+                "channel_config": {
+                    "nuclei": {
+                    "filter": "nuclei.",
+                    "name": "nuclei"
+                    }
+                },
+                "source": "engine",
+                "engine_url": "https://127.0.0.1:2957"
+            },
+            'actions': [
+                {'name': 'Generate Masks', 'callback': self.generate_masks, 'tooltip': 'Generate border masks from the annotation'},
+                {'name': 'Start Training', 'callback': self.start_train, 'tooltip': 'Start training on this dataset.'},
+                {'name': 'Run Prediction', 'callback': self.run_prediction, 'tooltip': 'Run Prediction on this dataset.'},
+            ]
+        }
+
+        await api.createWindow(name="Annotation for DPNUnet", fullscreen=True, type="ImageAnnotator", data=annotator_config, config={})
 
     def setup(self):
         api.log('initialized')
