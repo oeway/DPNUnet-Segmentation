@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.22",
+  "version": "0.1.24",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -183,8 +183,8 @@ def train_bowl(dash, config, paths, fn_mapping, save_path, log_path, model_path)
     train_idx, val_idx = idx[:int(split*sample_count)], idx[int(split*sample_count):]
     im_type = BorderImageType if not config.sigmoid else SigmoidBorderImageType
     im_val_type = PaddedImageType if not config.sigmoid else PaddedSigmoidImageType
-    ds = CachingImageProvider(im_type, paths, fn_mapping)
-    val_ds = CachingImageProvider(im_val_type, paths, fn_mapping)
+    ds = CachingImageProvider(im_type, paths, fn_mapping, scale_factor=1.0)
+    val_ds = CachingImageProvider(im_val_type, paths, fn_mapping, scale_factor=1.0)
     fold = 0
     api.showStatus('start training ...')
     dash.setLoading({'status_text': 'Start training...', 'loading': True})
@@ -209,7 +209,7 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_fa
     val_indexes = list(range(sample_count))
     im_val_type = PaddedImageType if not config.sigmoid else PaddedSigmoidImageType
     im_prov_type = InFolderImageProvider if test else ReadingImageProvider
-    ds = im_prov_type(im_val_type, paths, fn_mapping)
+    ds = im_prov_type(im_val_type, paths, fn_mapping, scale_factor=scale_factor)
     num_workers = 0 if os.name == 'nt' else 4
     api.showStatus('start prediction ...')
     dash.setLoading({'status_text': 'Start Prediction...', 'loading': True})
@@ -218,13 +218,13 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_fa
     def step_callback(result_dict):
         dash.setLoading({'status_text': 'Start prediction: ' + result_dict['name'], 'loading': True})
         api.log('result saved to ' + result_dict['output_path'])
-        if step%10==0:
-            asyncio.ensure_future(plot_images(result_dict['name'], {'input image': result_dict['input_path'], 'predicted mask': result_dict['output_path']}))
+        #if step%10==0:
+        asyncio.ensure_future(plot_images(result_dict['name'], {'input image': result_dict['input_path'], 'predicted mask': result_dict['output_path']}))
     keval = FullImageEvaluator(config, ds, test=test, flips=3, step_callback=step_callback,  num_workers=num_workers, border=0)
     fold =  0
     
     try:
-        keval.predict(model_path, val_indexes, ('fold' + str(fold) + "_") if test else "", scale_factor)
+        keval.predict(model_path, val_indexes, ('fold' + str(fold) + "_") if test else "")
         merge_files(keval.save_dir)
     except Exception as e:
         raise
@@ -294,7 +294,7 @@ class ImJoyPlugin():
         "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_border_mask.png'}",
         ]))
         config = load_config('configs/imjoy_dpn_softmax_s2.json')
-        ret = await api.showFileDialog(title="Please select a folder containing your testing data ( folder with a subfolder called `test`).", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
+        ret = await api.showFileDialog(title="Please select a folder containing your testing data ( folder with a subfolder called `test`).", root='/imjoy/imjoy-paper/SEGMENTATION-DATA', type= 'directory', engine= api.ENGINE_URL)
         config.dataset_path = os.path.join(ret.path, 'test')
         config.results_dir = os.path.join(ret.path, 'results')
         config.batch_size = 16
@@ -336,7 +336,7 @@ class ImJoyPlugin():
         ]))
 
         config = load_config('configs/imjoy_dpn_softmax.json')
-        ret = await api.showFileDialog(title="Please select a folder containing the training and testing data as subfolders ‘train’ and ‘test.", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
+        ret = await api.showFileDialog(title="Please select a folder containing the training and testing data as subfolders ‘train’ and ‘test.", root='/imjoy/imjoy-paper/SEGMENTATION-DATA', type= 'directory', engine= api.ENGINE_URL)
         config.dataset_path =  os.path.join(ret.path, 'train')
         config.results_dir = os.path.join(ret.path, 'results')
         config.nb_epoch = options.epochs
