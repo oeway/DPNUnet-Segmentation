@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.24",
+  "version": "0.1.25",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -123,6 +123,8 @@ class UpdateUI(Callback):
         self.step = 0
 
     def on_batch_end(self, batch):
+        if batch < 2:
+            self.dash.setLoading({'status_text': 'Training in progress', 'loading': False})
         if batch % 10 == 0:
             logs = self.metrics_collection.train_metrics
             self.logs = logs
@@ -170,7 +172,7 @@ def load_path_mapping(config, training):
     return paths, fn_mapping
 
 
-def train_bowl(dash, config, paths, fn_mapping, save_path, log_path, model_path):
+def train_bowl(dash, config, paths, fn_mapping, save_path, log_path, model_path, scale_factor):
     asyncio.set_event_loop(loop)
     dash.setLoading({'status_text': 'Loading data...', 'loading': True})
     torch.backends.cudnn.benchmark = True
@@ -183,13 +185,13 @@ def train_bowl(dash, config, paths, fn_mapping, save_path, log_path, model_path)
     train_idx, val_idx = idx[:int(split*sample_count)], idx[int(split*sample_count):]
     im_type = BorderImageType if not config.sigmoid else SigmoidBorderImageType
     im_val_type = PaddedImageType if not config.sigmoid else PaddedSigmoidImageType
-    ds = CachingImageProvider(im_type, paths, fn_mapping, scale_factor=1.0)
-    val_ds = CachingImageProvider(im_val_type, paths, fn_mapping, scale_factor=1.0)
+    ds = CachingImageProvider(im_type, paths, fn_mapping, scale_factor=scale_factor)
+    val_ds = CachingImageProvider(im_val_type, paths, fn_mapping, scale_factor=scale_factor)
     fold = 0
     api.showStatus('start training ...')
     dash.setLoading({'status_text': 'Start training...', 'loading': True})
     updateUI = UpdateUI(config.nb_epoch, dash)
-    num_workers = 0 if os.name == 'nt' else 4
+    num_workers = 0 # if os.name == 'nt' else 4
     try:
         if model_path is not None:
             model = torch.load(model_path)
@@ -350,9 +352,10 @@ class ImJoyPlugin():
             model_path = '../weights/dpn_softmax_f0/fold0_best.pth'
         else:
             model_path = None
+        scale_factor = 1.0
         api.log(f'model will be saved to {save_path}')
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Training DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
-        await loop.run_in_executor(None, train_bowl, self.dash, config, paths, fn_mapping, save_path, log_path, model_path)
+        await loop.run_in_executor(None, train_bowl, self.dash, config, paths, fn_mapping, save_path, log_path, model_path, scale_factor)
 
         api.alert(f'Training finished, model saved to {save_path}')
 
