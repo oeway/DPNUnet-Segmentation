@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -86,7 +86,7 @@ from merge_preds import merge_files
 import json
 import cv2
 from scipy.misc import imread
-
+import json
 import argparse
 
 if os.path.exists('/imjoy/imjoy-paper'):
@@ -126,6 +126,13 @@ class UpdateUI(Callback):
         api.log('epoch:'+str(self.epoch)+'/'+str(self.total_epoch) + ' '+ str(logs))
         # plot_tensors(self.dash, tensor_list, label, titles)
 
+def save_config(config, config_path):
+    d = {}
+    for k in config._fields:
+        v = getattr(config, k)
+        d[k] = v
+    with open(config_path, "w") as write_file:
+        json.dump(d, write_file)
 
 def load_config(config_path, training):
     with open(config_path, 'r') as f:
@@ -171,8 +178,10 @@ def train_bowl(dash, config, paths, fn_mapping):
     dash.setLoading({'status_text': 'Start training...', 'loading': True})
     updateUI = UpdateUI(config.nb_epoch, dash)
     num_workers = 0 if os.name == 'nt' else 4
+    save_config(config, os.path.join(config.dataset_path, 'config.json'))
+    pretrained_model_path = os.path.join(config.dataset_path, '__model__', config.folder, "fold" + str(fold) + "_checkpoint.pth")
     try:
-        train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=num_workers, callbacks=[updateUI], transforms=aug_victor(.97))
+        train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=num_workers, callbacks=[updateUI], transforms=aug_victor(.97), load_from=pretrained_model_path)
     except Exception as e:
         dash.setLoading({'status_text': 'Training failed with error: ' + str(e), 'loading': False})
         api.error(str(e))
@@ -197,9 +206,11 @@ def eval_bowl(dash, config, paths, fn_mapping):
         dash.setLoading({'status_text': 'Start prediction: ' + result_dict['name'], 'loading': True})
         api.log('result saved to ' + result_dict['save_path'])
     keval = FullImageEvaluator(config, ds, test=test, flips=3, step_callback=step_callback,  num_workers=num_workers, border=0)
-    fold =  0
+    fold = 0
     try:
-        keval.predict(fold, val_indexes)
+        model_path = os.path.join(config.dataset_path, '__model__', folder, 'fold{}_best.pth'.format(fold))
+        prefix = ""
+        keval.predict(model_path, val_indexes, prefix)
         merge_files(keval.save_dir)
     except Exception as e:
         dash.setLoading({'status_text': 'Prediction failed with error: ' + str(e), 'loading': False})
@@ -313,8 +324,6 @@ class ImJoyPlugin():
         config.batch_size = 16
         config.epoch_size = 24
 
-        save_path = os.path.join('..', 'weights', config.folder)
-        api.log(f'model will be saved to {save_path}')
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Training DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
         try:
             await loop.run_in_executor(None, train_bowl, self.dash, config, paths, fn_mapping)
@@ -322,7 +331,7 @@ class ImJoyPlugin():
             api.error(str(e))
             api.alert('Failed to start training, error: ' + str(e))
         else:
-            api.alert(f'Training finished, model saved to {save_path}')
+            api.alert(f'Training finished.')
 
     async def generate_masks(self, datasets_dir=None):
         if self.dialog is not None:
