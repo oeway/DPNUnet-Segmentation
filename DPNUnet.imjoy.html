@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -135,11 +135,15 @@ def save_config(config, config_path):
     with open(config_path, "w") as write_file:
         json.dump(d, write_file)
 
-def load_config(config_path, training):
+def load_config(config_path):
     with open(config_path, 'r') as f:
         cfg = json.load(f)
-        cfg['dataset_path'] = cfg['dataset_path'] + ('/train' if training else '/test')
+       
     config = Config(**cfg)
+    return config
+
+def get_path_mapping(config, training=True):
+    config.dataset_path = config.dataset_path + ('/train' if training else '/test')
     paths = {
         'masks': '',
         'images': '',
@@ -155,7 +159,7 @@ def load_config(config_path, training):
         paths = {k: os.path.join(config.dataset_path, p) for k, p in paths.items()}
     else:
         paths = {"images": config.dataset_path}
-    return config, paths, fn_mapping
+    return paths, fn_mapping
 
 
 def train_bowl(dash, config, paths, fn_mapping):
@@ -293,16 +297,17 @@ class ImJoyPlugin():
 
         pathObj = await api.showFileDialog(title="Please select a trained model for prediciton", root= default_model_folder, type="directory")
         model_dir = pathObj.path
-        # model_path = os.path.join(config.dataset_path, '__model__', config.folder, 'fold{}_best.pth'.format(fold))
-        config, paths, fn_mapping  = load_config(os.path.join(model_dir, 'config.json'), True)
+        config = load_config(os.path.join(model_dir, 'config.json'))
         model_path = os.path.join(model_dir, 'fold{}_best.pth'.format(fold))
-        # config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', True)
+        # config = load_config('configs/imjoy_dpn_softmax_s2.json')
         
         config.dataset_path = workdirObj.path
         config.results_dir = workdirObj.path
         config.batch_size = 16
         config.epoch_size = 24
-        api.log(str(config))
+        paths, fn_mapping  = get_path_mapping(config, training=False)
+        api.log('config: '+str(config))
+        
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name=" DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
         await loop.run_in_executor(None, eval_bowl, self.dash, model_path, config, paths, fn_mapping)
 
@@ -332,14 +337,15 @@ class ImJoyPlugin():
         "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_boarder_mask.png'}",
         ]))
 
-        config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax.json', True)
-        ret = await api.showFileDialog(title="Please select a folder containing the training and testing data as subfolders ‘train’ and ‘test.", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
+        config = load_config('configs/imjoy_dpn_softmax.json')
+        ret = await api.showFileDialog(title="Please select a folder containing the training and testing data as subfolders ‘train’ and ‘test.", root='/imjoy/imjoy-paper/SEGMENTATION-DATA', type= 'directory', engine= api.ENGINE_URL)
         config.dataset_path = ret.path
-        config.results_dir = os.path.join(config.dataset_path, 'results')
+        config.results_dir = config.dataset_path
         config.nb_epoch = options.epochs
         config.batch_size = 16
         config.epoch_size = 24
-
+        paths, fn_mapping  = get_path_mapping(config, training=True)
+        api.log('config: '+str(config))
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Training DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
         try:
             await loop.run_in_executor(None, train_bowl, self.dash, config, paths, fn_mapping)
@@ -352,12 +358,11 @@ class ImJoyPlugin():
     async def generate_masks(self, datasets_dir=None):
         if self.dialog is not None:
             self.dialog.close()
-        # ret = await api.showFileDialog(root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type="directory")
-        # datasets_dir = ret.path
-        # print("datasets_dir:", datasets_dir)
         if datasets_dir is None:
-            api.alert("please give me a directory!")
-            return
+            ret = await api.showFileDialog(root='/imjoy/imjoy-paper/SEGMENTATION-DATA', type="directory")
+            datasets_dir = ret.path
+            print("datasets_dir:", datasets_dir)
+    
         file_ids = os.listdir(os.path.join(datasets_dir, "train"))
         total = len(file_ids)
         for i, file_id in enumerate(file_ids):
