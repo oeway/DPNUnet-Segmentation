@@ -165,12 +165,30 @@ if __name__ == "__main__":
 
     # generate mask from annotation.josn
     datasets_dir = "/home/alex/Downloads/test/data/kaggle_data"
+    err_list = []
     for file_id in os.listdir(os.path.join(datasets_dir, "train")):
         file_path = os.path.join(datasets_dir, "train", file_id, "annotation.json")
+        # gen_mask_from_geojson([file_path], masks_to_create_value=["border_mask"])
         try:
-            gen_mask_from_geojson([file_path], masks_to_create_value=["weighted_boarder"])
+            gen_mask_from_geojson([file_path], masks_to_create_value=["border_mask"])
         except:
             print("generate mask error:", os.path.join(datasets_dir, "train", file_id))
+            err_list.append(file_id)
+    print("err_list:", err_list)
 
+    # # change the mask file name
+    # for file_id in os.listdir(os.path.join(datasets_dir, "train")):
+    #     file_path = os.path.join(datasets_dir, "train", file_id)
+    #     for id in os.listdir(file_path):
+    #         try:
+    #             shutil.move(os.path.join(file_path, "nuclei_weighted_boarder.png"),
+    #                         os.path.join(file_path, "nuclei_border_mask.png"))
+    #         except:
+    #             if os.path.exists(os.path.join(file_path, "nuclei_border_mask.png")):
+    #                 print("file exist:", os.path.join(file_path, "nuclei_border_mask.png"))
+    #             elif not os.path.exists(os.path.join(file_path, "nuclei_weighted_boarder.png")):
+    #                 print("file not exist:", os.path.join(file_path, "nuclei_weighted_boarder.png"))
+    #             else:
+    #                 print("move error:", os.path.join(file_path, "nuclei_weighted_boarder.png"))
 
 
