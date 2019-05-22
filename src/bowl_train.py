@@ -74,9 +74,8 @@ def eval_bowl():
     im_prov_type = InFolderImageProvider if test else ReadingImageProvider
     ds = im_prov_type(im_val_type, paths, fn_mapping)
     keval = FullImageEvaluator(config, ds, test=test, flips=3, num_workers=num_workers, border=0)
-    model_path = os.path.join(workdir, '__model__', folder, 'fold{}_best.pth'.format(fold))
-    prefix = ('fold0' + "_") if self.test else ""
-    keval.predict(model_path, val_indexes, prefix)
+    fold = args.fold
+    keval.predict('../weights/dpn_softmax_f0/fold0_best.pth', val_indexes, ('fold' + str(fold) + "_") if self.test else "")
     if test and args.fold is None:
         merge_files(keval.save_dir)
 

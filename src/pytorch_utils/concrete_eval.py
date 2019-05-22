@@ -27,7 +27,6 @@ class FullImageEvaluator(Evaluator):
             path = os.path.join(self.config.dataset_path, self.ds.fn_mapping['images'](name))
         else:
             path = os.path.join(self.config.dataset_path, 'images_all', name)
-        assert os.path.exists(path), 'input file not found:'+path
         rows, cols = cv2.imread(path, 0).shape[:2]
         prediction = prediction[0:rows, 0:cols,...]
         if prediction.shape[2] < 3:
@@ -38,7 +37,7 @@ class FullImageEvaluator(Evaluator):
         if self.test:
             name = os.path.split(name)[-1]
         
-        save_path = os.path.join(self.save_dir, self.ds.fn_mapping['masks'](name)) # os.path.join(self.save_dir + prefix, self.ds.fn_mapping['masks'](name))
+        save_path = os.path.join(self.config.dataset_path, self.ds.fn_mapping['masks'](name)) # os.path.join(self.save_dir + prefix, self.ds.fn_mapping['masks'](name))
 
         do_save = True
         if self.step_callback is not None:

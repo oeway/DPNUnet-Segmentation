@@ -10,7 +10,6 @@ from torch.optim.lr_scheduler import ExponentialLR
 from torch.utils.data.dataloader import DataLoader as PytorchDataLoader
 from tqdm import tqdm
 from typing import Type
-import json
 
 from dataset.neural_dataset import TrainDataset, ValDataset
 from .loss import dice_round, dice_loss, multi_class_dice, multi_class_dice_round, jaccard, jaccard_round
@@ -53,9 +52,9 @@ class Estimator:
         self.config = config
         self.optimizer_type = optimizer
 
-    def resume(self, checkpoint_path):
+    def resume(self, checkpoint_name):
         try:
-            checkpoint = torch.load(checkpoint_path)
+            checkpoint = torch.load(os.path.join(self.save_path, checkpoint_name))
         except FileNotFoundError:
             print("resume failed, file not found")
             return False
@@ -82,7 +81,7 @@ class Estimator:
             for param_group in self.optimizer.param_groups:
                 param_group['lr'] = self.lr
 
-        print("resumed from checkpoint {} on epoch: {}".format(checkpoint_path, self.start_epoch))
+        print("resumed from checkpoint {} on epoch: {}".format(os.path.join(self.save_path, checkpoint_name), self.start_epoch))
         return True
 
     def calculate_loss_multichannel(self, output, target, meter, training, iter_size):
@@ -180,6 +179,7 @@ class Estimator:
         if training:
             loss.backward()
 
+        # 源代码,训练出错
         # meter['loss'] += loss.data.cpu().numpy()[0]
         # meter['d_n'] += dice_body.data.cpu().numpy()[0] / iter_size
         # meter['d_b'] += dice_border.data.cpu().numpy()[0] / iter_size
@@ -235,7 +235,7 @@ class MetricsCollection:
         self.val_metrics = {}
 
 class PytorchTrain:
-    def __init__(self, estimator: Estimator, fold, callbacks=None, hard_negative_miner=None, load_from=None):
+    def __init__(self, estimator: Estimator, fold, callbacks=None, hard_negative_miner=None):
         self.fold = fold
         self.estimator = estimator
 
@@ -247,10 +247,7 @@ class PytorchTrain:
         self.metrics_collection = MetricsCollection()
         self.current_results = {}
 
-        if load_from is not None:
-            self.estimator.model.module = torch.load(load_from)
-        else:
-            self.estimator.resume(os.path.join(self.estimator.save_path, "fold" + str(fold) + "_checkpoint.pth"))
+        self.estimator.resume("fold" + str(fold) + "_checkpoint.pth")
         # if self.estimator.model_changed:
         #     callbacks.append(ColdStart(self.estimator.lr, 5, 30, 0.1))
 
@@ -314,30 +311,12 @@ class PytorchTrain:
 
         self.callbacks.on_train_end()
 
-def save_config(config, config_path):
-    d = {}
-    for k in config._fields:
-        v = getattr(config, k)
-        d[k] = v
-    with open(config_path, "w") as write_file:
-        json.dump(d, write_file)
 
-def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transforms=None, val_transforms=None, num_channels_changed=False, final_changed=False, cycle=False, callbacks=[], load_from=None):
-    results_dir = config.results_dir
-    if results_dir is None:
-        results_dir = os.path.abspath('..')
-    os.makedirs(results_dir, exist_ok=True)
+def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transforms=None, val_transforms=None, num_channels_changed=False, final_changed=False, cycle=False, callbacks=[]):
+    os.makedirs(os.path.join('..', 'weights'), exist_ok=True)
+    os.makedirs(os.path.join('..', 'logs'), exist_ok=True)
 
-    save_path = os.path.join(results_dir, '__model__', config.folder)
-    os.makedirs(save_path, exist_ok=True)
-
-    log_dir = os.path.join(results_dir, 'logs')
-    os.makedirs(log_dir, exist_ok=True)
-
-    save_config(config, os.path.join(save_path, 'config.json'))
-
-
-
+    save_path = os.path.join('..', 'weights', config.folder)
     model = models[config.network](num_classes=config.num_classes, num_channels=config.num_channels)
     estimator = Estimator(model, optimizers[config.optimizer], save_path,
                           config=config, num_channels_changed=num_channels_changed, final_changed=final_changed)
@@ -350,7 +329,7 @@ def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transform
         # LRDropCheckpointSaver(("fold"+str(fold)+"_checkpoint_e{epoch}.pth")),
         ModelFreezer(),
         # EarlyStopper(10),
-        TensorBoard(os.path.join(log_dir, config.folder, 'fold{}'.format(fold)))
+        TensorBoard(os.path.join('..', 'logs', config.folder, 'fold{}'.format(fold)))
     ]
     # if not num_channels_changed:
     #     callbacks.append(LastCheckpointSaver("fold"+str(fold)+"_checkpoint_rgb.pth", config.nb_epoch))
@@ -361,8 +340,7 @@ def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transform
     trainer = PytorchTrain(estimator,
                            fold=fold,
                            callbacks=callbacks,
-                           hard_negative_miner=hard_neg_miner,
-                           load_from=load_from)
+                           hard_negative_miner=hard_neg_miner)
 
     train_loader = PytorchDataLoader(TrainDataset(ds, train_idx, config, transforms=transforms),
                                      batch_size=config.batch_size,
