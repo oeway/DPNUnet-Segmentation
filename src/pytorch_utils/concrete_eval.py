@@ -24,10 +24,10 @@ class FullImageEvaluator(Evaluator):
 
     def save(self, name, prediction, prefix=""):
         if self.test:
-            path = os.path.join(self.config.dataset_path, self.ds.fn_mapping['images'](name))
+            input_path = os.path.join(self.config.dataset_path, self.ds.fn_mapping['images'](name))
         else:
-            path = os.path.join(self.config.dataset_path, 'images_all', name)
-        input_image = cv2.imread(path, 0)
+            input_path = os.path.join(self.config.dataset_path, 'images_all', name)
+        input_image = cv2.imread(input_path, 0)
         rows, cols = input_image.shape[:2]
         prediction = prediction[0:rows, 0:cols,...]
         if prediction.shape[2] < 3:
@@ -40,15 +40,10 @@ class FullImageEvaluator(Evaluator):
         
         save_path = os.path.join(self.config.dataset_path, self.ds.fn_mapping['masks'](name)) # os.path.join(self.save_dir + prefix, self.ds.fn_mapping['masks'](name))
 
-        do_save = True
-        if self.step_callback is not None:
-            skip_save = self.step_callback({'output': prediction, 'input': input_image, 'save_path': save_path, 'name': name})
-            if skip_save:
-                do_save = False
+        print('saving to ',  save_path)
+        folder, name = os.path.split(save_path)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        cv2.imwrite(save_path, (prediction * [255,255,0]).astype(np.uint8))
 
-        if do_save:
-            print('saving to ',  save_path)
-            folder, name = os.path.split(save_path)
-            if not os.path.exists(folder):
-                os.makedirs(folder)
-            cv2.imwrite(save_path, (prediction * [255,255,0]).astype(np.uint8))
+        self.step_callback({'output_path': save_path, 'input_path': input_path, 'name': name})
