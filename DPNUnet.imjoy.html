@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.19",
+  "version": "0.1.22",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -98,6 +98,22 @@ else:
 
 loop = asyncio.get_event_loop()
 
+
+async def plot_tensors(dash, tensor_list, label, titles=None):
+    image_list = [tensor.detach().cpu().numpy().reshape(tensor.shape[-2], tensor.shape[-1]) for tensor in tensor_list]
+    displays = {}
+    titles = titles or [ 'Tensor '+str(i) for i in range(len(image_list))]
+    for i in range(len(image_list)):
+        im = image_list[i]
+        min = im.min()
+        im = Image.fromarray(((im-min)/(im.max()-min)*255).astype('uint8'))
+        buffered = BytesIO()
+        im.save(buffered, format="JPEG")
+        img_str = base64.b64encode(buffered.getvalue()).decode('ascii')
+        imgurl = 'data:image/png;base64,' + img_str
+        displays[titles[i]] = imgurl
+    await dash.appendDisplay(label, displays)
+    
 class UpdateUI(Callback):
     def __init__(self, total_epoch, dash):
         self.total_epoch = total_epoch
@@ -125,14 +141,17 @@ class UpdateUI(Callback):
         api.showProgress(self.epoch/self.total_epoch*100)
         api.showStatus('training epoch:'+str(self.epoch)+'/'+str(self.total_epoch))
         api.log('epoch:'+str(self.epoch)+'/'+str(self.total_epoch) + ' '+ str(logs))
-        # plot_tensors(self.dash, tensor_list, label, titles)
+        #current_results['inputs': images, 'outputs': ypreds, 'target': ytrues]
+        #plot_tensors(self.dash, tensor_list, label, titles)
 
 
-def load_config(config_path, training):
+def load_config(config_path):
     with open(config_path, 'r') as f:
         cfg = json.load(f)
-        cfg['dataset_path'] = cfg['dataset_path'] + ('/train' if training else '/test')
     config = Config(**cfg)
+    return config
+
+def load_path_mapping(config, training):
     paths = {
         'masks': '',
         'images': '',
@@ -148,10 +167,10 @@ def load_config(config_path, training):
         paths = {k: os.path.join(config.dataset_path, p) for k, p in paths.items()}
     else:
         paths = {"images": config.dataset_path}
-    return config, paths, fn_mapping
+    return paths, fn_mapping
 
 
-def train_bowl(dash, config, paths, fn_mapping, save_path, log_path):
+def train_bowl(dash, config, paths, fn_mapping, save_path, log_path, model_path):
     asyncio.set_event_loop(loop)
     dash.setLoading({'status_text': 'Loading data...', 'loading': True})
     torch.backends.cudnn.benchmark = True
@@ -171,12 +190,19 @@ def train_bowl(dash, config, paths, fn_mapping, save_path, log_path):
     dash.setLoading({'status_text': 'Start training...', 'loading': True})
     updateUI = UpdateUI(config.nb_epoch, dash)
     num_workers = 0 if os.name == 'nt' else 4
-    train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=num_workers, callbacks=[updateUI], save_path=save_path, log_path=log_path, transforms=aug_victor(.97))
+    try:
+        if model_path is not None:
+            model = torch.load(model_path)
+            api.log('loaded model from ' + model_path)
+        train(ds, val_ds, fold, train_idx, val_idx, config, model=model, num_workers=num_workers, callbacks=[updateUI], save_path=save_path, log_path=log_path, transforms=aug_victor(.97))
+    except:
+        api.alert('Failed to train model')
+        raise
+    finally:
+        dash.setLoading({'status_text': 'Training Stopped', 'loading': False})
 
-
-def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images):
+def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_factor):
     asyncio.set_event_loop(loop)
-    config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', False)
     test = True
     cleanup_mac_hidden_files(config.dataset_path)
     sample_count = len(os.listdir(config.dataset_path))
@@ -188,15 +214,17 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images):
     api.showStatus('start prediction ...')
     dash.setLoading({'status_text': 'Start Prediction...', 'loading': True})
 
+    step =0
     def step_callback(result_dict):
         dash.setLoading({'status_text': 'Start prediction: ' + result_dict['name'], 'loading': True})
         api.log('result saved to ' + result_dict['output_path'])
-        asyncio.ensure_future(plot_images(result_dict['name'], {'input image': result_dict['input_path'], 'predicted mask': result_dict['output_path']}))
+        if step%10==0:
+            asyncio.ensure_future(plot_images(result_dict['name'], {'input image': result_dict['input_path'], 'predicted mask': result_dict['output_path']}))
     keval = FullImageEvaluator(config, ds, test=test, flips=3, step_callback=step_callback,  num_workers=num_workers, border=0)
     fold =  0
     
     try:
-        keval.predict(model_path, val_indexes, ('fold' + str(fold) + "_") if test else "")
+        keval.predict(model_path, val_indexes, ('fold' + str(fold) + "_") if test else "", scale_factor)
         merge_files(keval.save_dir)
     except Exception as e:
         raise
@@ -255,20 +283,7 @@ class ImJoyPlugin():
         except Exception as e:
             api.log('error: '+str(e))
     
-    async def plot_tensors(self, tensor_list, label, titles=None):
-        image_list = [tensor.detach().cpu().numpy().reshape(tensor.shape[-2], tensor.shape[-1]) for tensor in tensor_list]
-        displays = {}
-        titles = titles or [ 'Tensor '+str(i) for i in range(len(image_list))]
-        for i in range(len(image_list)):
-            im = image_list[i]
-            min = im.min()
-            im = Image.fromarray(((im-min)/(im.max()-min)*255).astype('uint8'))
-            buffered = BytesIO()
-            im.save(buffered, format="JPEG")
-            img_str = base64.b64encode(buffered.getvalue()).decode('ascii')
-            imgurl = 'data:image/png;base64,' + img_str
-            displays[titles[i]] = imgurl
-        await self.dash.appendDisplay(label, displays)
+
 
     async def predict(self):
         if self.dialog is not None:
@@ -278,16 +293,21 @@ class ImJoyPlugin():
         "Image file name { id: 'image_file_name', type:'string', placeholder: 'nuclei.png'}",
         "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_border_mask.png'}",
         ]))
-
-        config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', True)
+        config = load_config('configs/imjoy_dpn_softmax_s2.json')
         ret = await api.showFileDialog(title="Please select a folder containing your testing data ( folder with a subfolder called `test`).", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
-        config.dataset_path = ret.path
-        config.results_dir = os.path.join(config.dataset_path, 'results')
+        config.dataset_path = os.path.join(ret.path, 'test')
+        config.results_dir = os.path.join(ret.path, 'results')
         config.batch_size = 16
         config.epoch_size = 24
+
+        scale_factor = await api.prompt('What is the average nuclei size in your image in pixel?', 20)
+        scale_factor = float(scale_factor)/20
+        api.log('using scale factor = ', scale_factor)
+    
+        paths, fn_mapping  = load_path_mapping(config, False)
         model_path = os.path.join('..', 'weights', config.folder, 'fold0_best.pth') # '../weights/dpn_softmax_f0/fold0_best.pth'
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all'})
-        await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping, model_path, self.plot_images)
+        await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping, model_path, self.plot_images,scale_factor)
 
 
         await api.showStatus('Start post-processing...')
@@ -299,7 +319,7 @@ class ImJoyPlugin():
                 api.showProgress(step/total*100)
                 api.showStatus(f'Processing {step}/{total}: {name}')
 
-        postprocessing(os.path.join(config.dataset_path, 'test'), callback)
+        postprocessing(config.dataset_path, callback)
 
         await api.showProgress(100)
         api.alert(f'Prediction done, generated masks saved to {config.dataset_path}')
@@ -315,18 +335,24 @@ class ImJoyPlugin():
         "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_boarder_mask.png'}",
         ]))
 
-        config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax.json', True)
+        config = load_config('configs/imjoy_dpn_softmax.json')
         ret = await api.showFileDialog(title="Please select a folder containing the training and testing data as subfolders ‘train’ and ‘test.", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
-        config.dataset_path = ret.path
-        config.results_dir = os.path.join(config.dataset_path, 'results')
+        config.dataset_path =  os.path.join(ret.path, 'train')
+        config.results_dir = os.path.join(ret.path, 'results')
         config.nb_epoch = options.epochs
         config.batch_size = 16
         config.epoch_size = 24
+        paths, fn_mapping  = load_path_mapping(config, True)
         log_path =  os.path.join('..', 'logs', config.folder, 'fold0')
         save_path = os.path.join('..', 'weights', config.folder)
+        ret = await api.confirm('Do you want to start with pretrained model?')
+        if ret:
+            model_path = '../weights/dpn_softmax_f0/fold0_best.pth'
+        else:
+            model_path = None
         api.log(f'model will be saved to {save_path}')
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Training DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
-        await loop.run_in_executor(None, train_bowl, self.dash, config, paths, fn_mapping, save_path, log_path)
+        await loop.run_in_executor(None, train_bowl, self.dash, config, paths, fn_mapping, save_path, log_path, model_path)
 
         api.alert(f'Training finished, model saved to {save_path}')
 
