@@ -312,7 +312,7 @@ class PytorchTrain:
         self.callbacks.on_train_end()
 
 
-def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transforms=None, val_transforms=None, num_channels_changed=False, final_changed=False, cycle=False, callbacks=[], save_path=None, log_path=None):
+def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transforms=None, val_transforms=None, num_channels_changed=False, final_changed=False, cycle=False, callbacks=[], save_path=None, log_path=None, model=None):
     if log_path is None:
         log_path = os.path.join('..', 'logs', config.folder, 'fold{}'.format(fold))
     if save_path is None:
@@ -320,7 +320,8 @@ def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transform
 
     os.makedirs(log_path, exist_ok=True)
     os.makedirs(save_path, exist_ok=True)
-    model = models[config.network](num_classes=config.num_classes, num_channels=config.num_channels)
+    if model is None:
+        model = models[config.network](num_classes=config.num_classes, num_channels=config.num_channels)
     estimator = Estimator(model, optimizers[config.optimizer], save_path,
                           config=config, num_channels_changed=num_channels_changed, final_changed=final_changed)
 
