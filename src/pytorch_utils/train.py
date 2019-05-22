@@ -245,7 +245,7 @@ class PytorchTrain:
 
         self.hard_negative_miner = hard_negative_miner
         self.metrics_collection = MetricsCollection()
-        self.current_results = {}
+        self.current_results = None
 
         self.estimator.resume("fold" + str(fold) + "_checkpoint.pth")
         # if self.estimator.model_changed:
