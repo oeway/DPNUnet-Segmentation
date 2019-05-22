@@ -6,9 +6,9 @@
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "[TODO: describe this plugin with one sentence.]",
-  "tags": [],
+  "tags": ["CPU", "GPU"],
   "ui": "",
   "cover": "",
   "inputs": null,
@@ -16,35 +16,57 @@
   "flags": [],
   "icon": "extension",
   "api_version": "0.1.5",
-  "env": "conda create -n dsb2018 python=3.6.8",
-  "requirements": ["pip: descartes palettable geojson read-roi gputil namedlist", "pip: lightgbm imgaug scipy==1.0.0 pandas", "conda: opencv tqdm", "conda: pytorch=0.4.1 cuda90 -c pytorch", "pip: torchvision tensorboardX", "repo: https://github.com/oeway/DPNUnet-Segmentation"],
-  "dependencies": ["oeway/ImJoy-Plugins:Im2Im-Dashboard", "https://raw.githubusercontent.com/oeway/DPNUnet-Segmentation/master/DPNUnet-docs.imjoy.html", "https://gist.githubusercontent.com/oeway/9f3866424835d94f05f857178e21603d/raw/ImageAnnotator.imjoy.html", "https://gist.githubusercontent.com/oeway/961c8d7abe24383d3ad6312669fe1d7c/raw/launchpad.imjoy.html"]
+  "env": {
+    "CPU": ["conda create -n dsb2018-cpu python=3.6.8"],
+    "GPU": ["conda create -n dsb2018-gpu python=3.6.8"]
+  },
+  "requirements": {"CPU": ["pip: descartes palettable geojson read-roi gputil namedlist",
+                           "pip: lightgbm imgaug scipy==1.0.0 pandas",
+                           "conda: opencv tqdm",
+                           "conda: pytorch=0.4.1 -c pytorch",
+                           "pip: torchvision tensorboardX",
+                           "repo: https://github.com/oeway/DPNUnet-Segmentation"],
+                    "GPU": ["pip: descartes palettable geojson read-roi gputil namedlist",
+                           "pip: lightgbm imgaug scipy==1.0.0 pandas",
+                           "conda: opencv tqdm",
+                           "conda: pytorch=0.4.1 cuda90 -c pytorch",
+                           "pip: torchvision tensorboardX",
+                           "repo: https://github.com/oeway/DPNUnet-Segmentation"]
+                   },
+  "dependencies": ["oeway/ImJoy-Plugins:Im2Im-Dashboard",
+                   "https://raw.githubusercontent.com/oeway/DPNUnet-Segmentation/master/DPNUnet-docs.imjoy.html",
+                   "https://gist.githubusercontent.com/oeway/9f3866424835d94f05f857178e21603d/raw/ImageAnnotator.imjoy.html",
+                   "https://gist.githubusercontent.com/oeway/961c8d7abe24383d3ad6312669fe1d7c/raw/launchpad.imjoy.html"]
 }
 </config>
 
 <script lang="python">
+from imjoy import api
 import os
 if os.path.exists('/imjoy/imjoy-paper/data-science-bowl/DPNUnet-segmentation-imjoy/src'):
     os.chdir('/imjoy/imjoy-paper/data-science-bowl/DPNUnet-segmentation-imjoy/src')
 else:
     os.chdir('DPNUnet-Segmentation/src')
 
-import GPUtil
-# Set CUDA_DEVICE_ORDER so the IDs assigned by CUDA match those from nvidia-smi
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-# Get the first available GPU
-DEVICE_ID_LIST = GPUtil.getFirstAvailable()
-api.log(f'Available GPUs: {DEVICE_ID_LIST}')
-if len(DEVICE_ID_LIST)<= 0:
-    api.alert('No GPU available')
-    raise Exception('No GPU available')
-DEVICE_ID = DEVICE_ID_LIST[0] # grab first element from list
-api.log(f'Set GPU id to : {DEVICE_ID}')
-# Set CUDA_VISIBLE_DEVICES to mask out all other GPUs than the first available device id
-os.environ["CUDA_VISIBLE_DEVICES"] = str(DEVICE_ID)
+if api.TAG == 'GPU':
+    import GPUtil
+    # Get the first available GPU
+    DEVICE_ID_LIST = GPUtil.getFirstAvailable()
+    # Set CUDA_DEVICE_ORDER so the IDs assigned by CUDA match those from nvidia-smi
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    api.log(f'Available GPUs: {DEVICE_ID_LIST}')
+    if len(DEVICE_ID_LIST)<= 0:
+        api.alert('No GPU available')
+        raise Exception('No GPU available')
+    DEVICE_ID = DEVICE_ID_LIST[0] # grab first element from list
+    api.log(f'Set GPU id to : {DEVICE_ID}')
+    # Set CUDA_VISIBLE_DEVICES to mask out all other GPUs than the first available device id
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(DEVICE_ID)
+else:
+    api.log('use cpu to plugin')
+
 
 import asyncio
-from imjoy import api
 from geojson_utils import masks_to_annotation, gen_mask_from_geojson
 from postprocessing import wsh
 import torch
@@ -131,7 +153,8 @@ def load_config(config_path, training):
 def train_bowl(dash, config, paths, fn_mapping):
     asyncio.set_event_loop(loop)
     dash.setLoading({'status_text': 'Loading data...', 'loading': True})
-    torch.backends.cudnn.benchmark = True
+    if api.TAG == 'GPU':
+        torch.backends.cudnn.benchmark = True
     cleanup_mac_hidden_files(config.dataset_path)
     sample_count = len(os.listdir(config.dataset_path))
     idx = list(range(sample_count))
@@ -188,8 +211,21 @@ def postprocessing(test_dir, step_callback):
 class ImJoyPlugin():
     def __init__(self):
         self.dialog = None
-
+        self.anno_win = None
     async def run(self, ctx):
+        # ret = await api.showFileDialog(root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type="directory")
+        # datasets_dir = ret.path
+        # print("datasets_dir:", datasets_dir)
+        # plugin_data = [
+        #         {'name': 'Generate masks', 'description': 'Generate masks from annotations for training.', 'callback': self.generate_masks, 'img': 'https://img.icons8.com/color/96/000000/metamorphose.png'},
+        #         {'name': 'Train with data from the engine', 'description': 'Use training data stored on a (local or remote) plugin engine.', 'callback': self.train, 'img': 'https://img.icons8.com/color/96/000000/services.png'},
+        #         {'name': 'Predict', 'description': 'Segment nuclei in images.', 'callback': self.predict, 'img': 'https://img.icons8.com/color/96/000000/double-right.png'}
+        #      ]
+        # self.anno_win = await api.createWindow(name="Annotation for DPNUnet", fullscreen=True, type="ImageAnnotator",
+        #                                        data=plugin_data,
+        #                                        config={})
+        # self.dialog = await api.showDialog(type='launchpad', data= plugin_data)
+
         self.dialog = await api.showDialog(type='launchpad', data= [
                 {'name': 'Annotate images', 'description': 'Start annotation of images.', 'callback': self.start_annotation, 'img': 'https://img.icons8.com/color/96/000000/edit.png'},
                 {'name': 'Generate masks', 'description': 'Generate masks from annotations for training.', 'callback': self.generate_masks, 'img': 'https://img.icons8.com/color/96/000000/metamorphose.png'},
@@ -207,7 +243,7 @@ class ImJoyPlugin():
         except:
             this.win_docs = await api.createWindow({
                     'name': 'Documentation - DPNUnet',
-                    'type': 'DPNUnet-docs',
+                    'type': 'DPNUnet-Segmentation-docs',
                     'w':30, 'h':20,
                     'data': {}
                     })
@@ -271,12 +307,15 @@ class ImJoyPlugin():
 
         api.alert(f'Training finished, model saved to {save_path}')
 
-    async def generate_masks(self):
+    async def generate_masks(self, datasets_dir=None):
         if self.dialog is not None:
             self.dialog.close()
-        ret = await api.showFileDialog(root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type="directory")
-        datasets_dir = ret.path
-        print("datasets_dir:", datasets_dir)
+        # ret = await api.showFileDialog(root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type="directory")
+        # datasets_dir = ret.path
+        # print("datasets_dir:", datasets_dir)
+        if datasets_dir is None:
+            api.alert("please give me a directory!")
+            return
         file_ids = os.listdir(os.path.join(datasets_dir, "train"))
         total = len(file_ids)
         for i, file_id in enumerate(file_ids):
@@ -290,7 +329,7 @@ class ImJoyPlugin():
         await api.showProgress(100)
         await api.alert('Finished, generated masks saved to ' + datasets_dir)
 
-    async def start_training(self, config):
+    async def start_train(self, config):
         api.alert('training:'+str(config))
         api.log('dataset' + str(config.dataset))
         api.log('current sample' + str(config.current_sample))
@@ -304,7 +343,6 @@ class ImJoyPlugin():
     async def start_annotation(self):
         if self.dialog is not None:
             self.dialog.close()
-    
         annotator_config = {
             'dataset': {
                 "api_version": "0.1.6",
@@ -312,24 +350,43 @@ class ImJoyPlugin():
                 "name": "kaggle_data",
                 "channel_config": {
                     "nuclei": {
-                    "filter": "nuclei.",
-                    "name": "nuclei"
+                        "filter": "nuclei.",
+                        "name": "nuclei"
                     }
                 },
                 "source": "engine",
                 "engine_url": "https://127.0.0.1:2957"
             },
             'actions': [
-                {'name': 'Generate Masks', 'callback': self.generate_masks, 'tooltip': 'Generate border masks from the annotation'},
-                {'name': 'Start Training', 'callback': self.start_train, 'tooltip': 'Start training on this dataset.'},
-                {'name': 'Run Prediction', 'callback': self.run_prediction, 'tooltip': 'Run Prediction on this dataset.'},
+                {'name': 'Generate Masks', 'callback': self.generate_masks,
+                 'tooltip': 'Generate border masks from the annotation'},
+                {'name': 'Start Training', 'callback': self.start_train,
+                 'tooltip': 'Start training on this dataset.'},
+                {'name': 'Run Prediction', 'callback': self.run_prediction,
+                 'tooltip': 'Run Prediction on this dataset.'},
             ]
         }
 
-        await api.createWindow(name="Annotation for DPNUnet", fullscreen=True, type="ImageAnnotator", data=annotator_config, config={})
+        await api.createWindow(name="Annotation for DPNUnet", fullscreen=True, type="ImageAnnotator",
+                               data=annotator_config, config={})
 
     def setup(self):
         api.log('initialized')
+        api.register(name="generate_masks_test", run=self.generate_masks_test, ui="generate_masks_test")
+        api.register(name="train_test", run=self.train_test, ui="train_test")
+        api.register(name="predict_test", run=self.predict_test, ui="predict_test")
+
+    async def generate_masks_test(self, my=None):
+        ret = await api.showFileDialog(root=os.getcwd(), type="directory")
+        datasets_dir = ret.path
+        print("datasets_dir:", datasets_dir)
+        await self.generate_masks(datasets_dir)
+
+    async def train_test(self, my=None):
+        await self.train()
+
+    async def predict_test(self, my=None):
+        await self.predict()
 
 api.export(ImJoyPlugin())
 </script>
