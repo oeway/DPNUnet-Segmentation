@@ -14,11 +14,13 @@ class Callback(object):
         self.trainer = None
         self.estimator = None
         self.metrics_collection = None
+        self.current_results = None
 
     def set_trainer(self, trainer):
         self.trainer = trainer
         self.metrics_collection = trainer.metrics_collection
         self.estimator = trainer.estimator
+        self.current_results = trainer.current_results
 
     def on_batch_begin(self, batch):
         pass
