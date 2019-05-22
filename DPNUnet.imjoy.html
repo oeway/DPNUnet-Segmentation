@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -122,7 +122,6 @@ class UpdateUI(Callback):
         self.dash = dash
         self.step = 0
 
-
     def on_batch_end(self, batch):
         if batch % 10 == 0:
             logs = self.metrics_collection.train_metrics
@@ -146,11 +145,13 @@ class UpdateUI(Callback):
         #plot_tensors(self.dash, tensor_list, label, titles)
 
 
-def load_config(config_path, training):
+def load_config(config_path):
     with open(config_path, 'r') as f:
         cfg = json.load(f)
-        cfg['dataset_path'] = cfg['dataset_path'] + ('/train' if training else '/test')
     config = Config(**cfg)
+    return config
+
+def load_path_mapping(config, training):
     paths = {
         'masks': '',
         'images': '',
@@ -166,7 +167,7 @@ def load_config(config_path, training):
         paths = {k: os.path.join(config.dataset_path, p) for k, p in paths.items()}
     else:
         paths = {"images": config.dataset_path}
-    return config, paths, fn_mapping
+    return paths, fn_mapping
 
 
 def train_bowl(dash, config, paths, fn_mapping, save_path, log_path, model_path):
@@ -202,7 +203,6 @@ def train_bowl(dash, config, paths, fn_mapping, save_path, log_path, model_path)
 
 def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images):
     asyncio.set_event_loop(loop)
-    #config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', False)
     test = True
     cleanup_mac_hidden_files(config.dataset_path)
     sample_count = len(os.listdir(config.dataset_path))
@@ -214,10 +214,12 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images):
     api.showStatus('start prediction ...')
     dash.setLoading({'status_text': 'Start Prediction...', 'loading': True})
 
+    step =0
     def step_callback(result_dict):
         dash.setLoading({'status_text': 'Start prediction: ' + result_dict['name'], 'loading': True})
         api.log('result saved to ' + result_dict['output_path'])
-        asyncio.ensure_future(plot_images(result_dict['name'], {'input image': result_dict['input_path'], 'predicted mask': result_dict['output_path']}))
+        if step%10==0:
+            asyncio.ensure_future(plot_images(result_dict['name'], {'input image': result_dict['input_path'], 'predicted mask': result_dict['output_path']}))
     keval = FullImageEvaluator(config, ds, test=test, flips=3, step_callback=step_callback,  num_workers=num_workers, border=0)
     fold =  0
     
@@ -291,13 +293,13 @@ class ImJoyPlugin():
         "Image file name { id: 'image_file_name', type:'string', placeholder: 'nuclei.png'}",
         "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_border_mask.png'}",
         ]))
-
-        config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax_s2.json', True)
+        config = load_config('configs/imjoy_dpn_softmax_s2.json')
         ret = await api.showFileDialog(title="Please select a folder containing your testing data ( folder with a subfolder called `test`).", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
-        config.dataset_path = ret.path
-        config.results_dir = os.path.join(config.dataset_path, 'results')
+        config.dataset_path = os.path.join(ret.path, 'test')
+        config.results_dir = os.path.join(ret.path, 'results')
         config.batch_size = 16
         config.epoch_size = 24
+        paths, fn_mapping  = load_path_mapping(config, False)
         model_path = os.path.join('..', 'weights', config.folder, 'fold0_best.pth') # '../weights/dpn_softmax_f0/fold0_best.pth'
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all'})
         await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping, model_path, self.plot_images)
@@ -312,7 +314,7 @@ class ImJoyPlugin():
                 api.showProgress(step/total*100)
                 api.showStatus(f'Processing {step}/{total}: {name}')
 
-        postprocessing(os.path.join(config.dataset_path, 'test'), callback)
+        postprocessing(config.dataset_path, callback)
 
         await api.showProgress(100)
         api.alert(f'Prediction done, generated masks saved to {config.dataset_path}')
@@ -328,13 +330,14 @@ class ImJoyPlugin():
         "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_boarder_mask.png'}",
         ]))
 
-        config, paths, fn_mapping = load_config('configs/imjoy_dpn_softmax.json', True)
+        config = load_config('configs/imjoy_dpn_softmax.json')
         ret = await api.showFileDialog(title="Please select a folder containing the training and testing data as subfolders ‘train’ and ‘test.", root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type= 'directory', engine= api.ENGINE_URL)
-        config.dataset_path = ret.path
-        config.results_dir = os.path.join(config.dataset_path, 'results')
+        config.dataset_path =  os.path.join(ret.path, 'train')
+        config.results_dir = os.path.join(ret.path, 'results')
         config.nb_epoch = options.epochs
         config.batch_size = 16
         config.epoch_size = 24
+        paths, fn_mapping  = load_path_mapping(config, True)
         log_path =  os.path.join('..', 'logs', config.folder, 'fold0')
         save_path = os.path.join('..', 'weights', config.folder)
         ret = await api.confirm('Do you want to start with pretrained model?')
