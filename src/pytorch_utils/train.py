@@ -332,7 +332,7 @@ def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transform
     log_dir = os.path.join(results_dir, 'logs')
     os.makedirs(log_dir, exist_ok=True)
 
-    save_config(config, save_path)
+    save_config(config, os.path.join(save_path, 'config.json'))
 
     model = models[config.network](num_classes=config.num_classes, num_channels=config.num_channels)
     estimator = Estimator(model, optimizers[config.optimizer], save_path,
