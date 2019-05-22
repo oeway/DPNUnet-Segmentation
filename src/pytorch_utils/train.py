@@ -250,7 +250,7 @@ class PytorchTrain:
         if load_from is not None:
             self.estimator.resume(load_from)
         else:
-            self.estimator.resume(os.path.join(self.save_path, "fold" + str(fold) + "_checkpoint.pth"))
+            self.estimator.resume(os.path.join(self.estimator.save_path, "fold" + str(fold) + "_checkpoint.pth"))
         # if self.estimator.model_changed:
         #     callbacks.append(ColdStart(self.estimator.lr, 5, 30, 0.1))
 
