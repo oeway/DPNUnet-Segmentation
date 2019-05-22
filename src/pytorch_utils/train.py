@@ -180,7 +180,6 @@ class Estimator:
         if training:
             loss.backward()
 
-        # 源代码,训练出错
         # meter['loss'] += loss.data.cpu().numpy()[0]
         # meter['d_n'] += dice_body.data.cpu().numpy()[0] / iter_size
         # meter['d_b'] += dice_border.data.cpu().numpy()[0] / iter_size
