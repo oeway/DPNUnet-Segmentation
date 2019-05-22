@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -63,8 +63,8 @@ if api.TAG == 'GPU':
     # Set CUDA_VISIBLE_DEVICES to mask out all other GPUs than the first available device id
     os.environ["CUDA_VISIBLE_DEVICES"] = str(DEVICE_ID)
 else:
-    api.log('use cpu to plugin')
-
+    api.log('Using CPU mode.')
+    api.alert('WARNING: you are running the plugin in CPU mode, training will be slow.')
 
 import asyncio
 from geojson_utils import masks_to_annotation, gen_mask_from_geojson
@@ -171,8 +171,14 @@ def train_bowl(dash, config, paths, fn_mapping):
     dash.setLoading({'status_text': 'Start training...', 'loading': True})
     updateUI = UpdateUI(config.nb_epoch, dash)
     num_workers = 0 if os.name == 'nt' else 4
-    train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=num_workers, callbacks=[updateUI], transforms=aug_victor(.97))
-
+    try:
+        train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=num_workers, callbacks=[updateUI], transforms=aug_victor(.97))
+    except Exception as e:
+        dash.setLoading({'status_text': 'Training failed with error: ' + str(e), 'loading': False})
+        api.error(str(e))
+        throw
+    finally:
+        api.log('training stopped')
 
 def eval_bowl(dash, config, paths, fn_mapping):
     asyncio.set_event_loop(loop)
@@ -192,8 +198,15 @@ def eval_bowl(dash, config, paths, fn_mapping):
         api.log('result saved to ' + result_dict['save_path'])
     keval = FullImageEvaluator(config, ds, test=test, flips=3, step_callback=step_callback,  num_workers=num_workers, border=0)
     fold =  0
-    keval.predict(fold, val_indexes)
-    merge_files(keval.save_dir)
+    try:
+        keval.predict(fold, val_indexes)
+        merge_files(keval.save_dir)
+    except Exception as e:
+        dash.setLoading({'status_text': 'Prediction failed with error: ' + str(e), 'loading': False})
+        api.error(str(e))
+        throw
+    finally:
+        api.log('prediction stopped')
 
 
 def postprocessing(test_dir, step_callback):
@@ -303,9 +316,13 @@ class ImJoyPlugin():
         save_path = os.path.join('..', 'weights', config.folder)
         api.log(f'model will be saved to {save_path}')
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Training DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
-        await loop.run_in_executor(None, train_bowl, self.dash, config, paths, fn_mapping)
-
-        api.alert(f'Training finished, model saved to {save_path}')
+        try:
+            await loop.run_in_executor(None, train_bowl, self.dash, config, paths, fn_mapping)
+        except Exception as e:
+            api.error(str(e))
+            api.alert('Failed to start training, error: ' + str(e))
+        else:
+            api.alert(f'Training finished, model saved to {save_path}')
 
     async def generate_masks(self, datasets_dir=None):
         if self.dialog is not None:
