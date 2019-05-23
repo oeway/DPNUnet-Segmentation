@@ -11,7 +11,7 @@ Plugins for annotation, prediction, and training are provided.
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.28",
+  "version": "0.1.29",
   "description": "Nuclei segmentation with deep learning.",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -224,6 +224,9 @@ def train_bowl(dash, config, paths, fn_mapping, plot_images, save_path, log_path
         if model_path is not None:
             model = torch.load(model_path)
             api.log('loaded model from ' + model_path)
+            resume = True
+        else:
+            resume = False
 
         callbacks=[updateUI]
         transforms=aug_victor(.97)
@@ -263,6 +266,7 @@ def train_bowl(dash, config, paths, fn_mapping, plot_images, save_path, log_path
         trainer = PytorchTrain(estimator,
                             fold=fold,
                             callbacks=callbacks,
+                            resume=resume,
                             hard_negative_miner=hard_neg_miner)
 
         train_loader = PytorchDataLoader(TrainDataset(ds, train_idx, config, transforms=transforms),
@@ -487,7 +491,7 @@ class ImJoyPlugin():
         paths, fn_mapping  = load_path_mapping(config, True)
         log_path =  os.path.join('..', 'logs', 'dpn_softmax_f0' 'fold0')
         save_path = os.path.join('..', 'weights', 'dpn_softmax_f0')
-        ret = await api.confirm('Do you want to start with pretrained model?')
+        ret = await api.confirm(content='Do you want to start with pretrained model?', confirm_text="Yes, use pretrained model", cancel_text="No, start from scratch")
         if ret:
             model_path = '../weights/dpn_softmax_f0/fold0_best.pth'
         else:
