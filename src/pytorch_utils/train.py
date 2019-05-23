@@ -235,7 +235,7 @@ class MetricsCollection:
         self.val_metrics = {}
 
 class PytorchTrain:
-    def __init__(self, estimator: Estimator, fold, callbacks=None, hard_negative_miner=None):
+    def __init__(self, estimator: Estimator, fold, callbacks=None, resume=True, hard_negative_miner=None):
         self.fold = fold
         self.estimator = estimator
 
@@ -247,7 +247,8 @@ class PytorchTrain:
         self.metrics_collection = MetricsCollection()
         self.current_results = None
 
-        self.estimator.resume("fold" + str(fold) + "_checkpoint.pth")
+        if resume:
+            self.estimator.resume("fold" + str(fold) + "_checkpoint.pth")
         # if self.estimator.model_changed:
         #     callbacks.append(ColdStart(self.estimator.lr, 5, 30, 0.1))
 
@@ -312,7 +313,7 @@ class PytorchTrain:
         self.callbacks.on_train_end()
 
 
-def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transforms=None, val_transforms=None, num_channels_changed=False, final_changed=False, cycle=False, callbacks=[], save_path=None, log_path=None, model=None):
+def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transforms=None, val_transforms=None, num_channels_changed=False, final_changed=False, cycle=False, callbacks=[], save_path=None, log_path=None, model=None, resume=True):
     if log_path is None:
         log_path = os.path.join('..', 'logs', config.folder, 'fold{}'.format(fold))
     if save_path is None:
@@ -343,6 +344,7 @@ def train(ds, val_ds, fold, train_idx, val_idx, config, num_workers=0, transform
 
     trainer = PytorchTrain(estimator,
                            fold=fold,
+                           resume=resume,
                            callbacks=callbacks,
                            hard_negative_miner=hard_neg_miner)
 
