@@ -11,7 +11,7 @@ Plugins for annotation, prediction, and training are provided.
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.29",
+  "version": "0.1.30",
   "description": "Nuclei segmentation with deep learning.",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -409,6 +409,9 @@ class ImJoyPlugin():
                 save_path = os.path.join('..', 'weights', 'dpn_softmax_f0', 'fold0_best.pth')
                 if os.path.exists(workdirObj.path) and workdirObj.path.endswith('.pth'):
                     copyfile(workdirObj.path, save_path)
+                    checkpoint = os.path.join('..', 'weights', 'dpn_softmax_f0', 'fold0_checkpoint.pth')
+                    if os.path.exists(checkpoint):
+                        os.remove(checkpoint)
                     api.log(f'import model file from {workdirObj.path} , copied to {save_path}')
                     api.alert('Pretrained model has been imported!')
                 else:
@@ -476,7 +479,7 @@ class ImJoyPlugin():
         if self.dialog is not None:
             self.dialog.close()
         options = await api.showDialog( name="Training Configurations", ui= "<br>".join([
-        "Model Name {id: 'model_name', type: 'string', placeholder: 'dpnunet-model-1'}",
+        # "Model Name {id: 'model_name', type: 'string', placeholder: 'dpnunet-model-1'}",
         "Epochs { id: 'epochs', type:'number', placeholder: 10000}",
         "Image file name { id: 'image_file_name', type:'string', placeholder: 'nuclei.png'}",
         "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_boarder_mask.png'}",
@@ -492,11 +495,11 @@ class ImJoyPlugin():
         paths, fn_mapping  = load_path_mapping(config, True)
         log_path =  os.path.join('..', 'logs', 'dpn_softmax_f0' 'fold0')
         save_path = os.path.join('..', 'weights', 'dpn_softmax_f0')
-        ret = await api.confirm(content='Do you want to start with pretrained model?', confirm_text="Yes, use pretrained model", cancel_text="No, start from scratch")
-        if ret:
-            model_path = '../weights/dpn_softmax_f0/fold0_best.pth'
-        else:
+        
+        model_path = '../weights/dpn_softmax_f0/fold0_best.pth'
+        if not os.path.exists(model_path):
             model_path = None
+
         scale_factor = 1.0
         api.log(f'model will be saved to {save_path}')
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="Training DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all', 'metrics': ["loss", "val_loss"], 'callbacks': ['onStep']})
