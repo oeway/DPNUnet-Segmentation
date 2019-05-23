@@ -11,7 +11,7 @@ Plugins for annotation, prediction, and training are provided.
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "description": "Nuclei segmentation with deep learning.",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -361,6 +361,8 @@ else:
 class ImJoyPlugin():
     def __init__(self):
         self.dialog = None
+        self.win_docs = None
+
     async def run(self, ctx):
         self.dialog = await api.showDialog(type='launchpad', data= [
                 {'name': 'Load trained model', 'description': 'Load a pre-trained model', 'callback': self.load_model, 'img': 'https://img.icons8.com/ios-glyphs/90/000000/upload.png'},
@@ -377,14 +379,14 @@ class ImJoyPlugin():
         if self.dialog is not None:
             self.dialog.close()
         try:
-            await this.win_docs.run({'data': {}})
+            await self.win_docs.run({'data': {}})
         except:
-            this.win_docs = await api.createWindow({
+            self.win_docs = await api.createWindow({
                     'name': 'Documentation - DPNUnet',
                     'type': 'DPNUnet-docs',
                     'w':30, 'h':20,
                     'data': {}
-                    })
+            })
 
     async def plot_images(self, label, images):
         try:
