@@ -203,7 +203,8 @@ def load_path_mapping(config, training):
 def train_bowl(dash, config, paths, fn_mapping, plot_images, save_path, log_path, model_path, scale_factor):
     asyncio.set_event_loop(loop)
     dash.setLoading({'status_text': 'Loading data...', 'loading': True})
-    torch.backends.cudnn.benchmark = True
+    if api.TAG == 'GPU':
+        torch.backends.cudnn.benchmark = True
     cleanup_mac_hidden_files(config.dataset_path)
     sample_count = len(os.listdir(config.dataset_path))
     idx = list(range(sample_count))
