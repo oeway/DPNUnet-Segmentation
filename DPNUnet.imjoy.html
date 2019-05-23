@@ -226,6 +226,7 @@ def train_bowl(dash, config, paths, fn_mapping, plot_images, save_path, log_path
             api.log('loaded model from ' + model_path)
             resume = True
         else:
+            model = None
             resume = False
 
         callbacks=[updateUI]
