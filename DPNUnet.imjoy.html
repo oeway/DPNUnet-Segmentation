@@ -1,13 +1,18 @@
 <docs lang="markdown">
-[TODO: write documentation for this plugin.]
+Plugin framework for nuclear segmentation based on the winning approach (DPNUnet) of the 2018 Kaggle Data Science Bowl.
+
+Plugins for annotation, prediction, and training are provided.
+
+* **Description of DPNUnet**: https://www.kaggle.com/c/data-science-bowl-2018/discussion/54741
+* **GitHub**: https://github.com/selimsef/dsb2018_topcoders
 </docs>
 
 <config lang="json">
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.27",
-  "description": "[TODO: describe this plugin with one sentence.]",
+  "version": "0.1.28",
+  "description": "Nuclei segmentation with deep learning.",
   "tags": ["CPU", "GPU"],
   "ui": "",
   "cover": "",
@@ -36,7 +41,8 @@
   "dependencies": ["oeway/ImJoy-Plugins:Im2Im-Dashboard",
                    "https://raw.githubusercontent.com/oeway/DPNUnet-Segmentation/master/DPNUnet-docs.imjoy.html",
                    "https://gist.githubusercontent.com/oeway/9f3866424835d94f05f857178e21603d/raw/ImageAnnotator.imjoy.html",
-                   "https://gist.githubusercontent.com/oeway/961c8d7abe24383d3ad6312669fe1d7c/raw/launchpad.imjoy.html"]
+                   "https://gist.githubusercontent.com/oeway/961c8d7abe24383d3ad6312669fe1d7c/raw/launchpad.imjoy.html"],
+  "cover": ["https://dl.dropbox.coms/8t2dlbfisdyfezc/dpnunet-prediction-example.png"]
 }
 </config>
 
@@ -132,7 +138,7 @@ async def plot_tensors(dash, tensor_list, label, titles=None):
         imgurl = 'data:image/png;base64,' + img_str
         displays[titles[i]] = imgurl
     await dash.appendDisplay(label, displays)
-    
+
 class UpdateUI(Callback):
     def __init__(self, total_epoch, dash):
         self.total_epoch = total_epoch
@@ -167,7 +173,7 @@ class UpdateUI(Callback):
         api.showStatus('training epoch:'+str(self.epoch)+'/'+str(self.total_epoch))
         api.log('epoch:'+str(self.epoch)+'/'+str(self.total_epoch) + ' '+ str(logs))
         #current_results['inputs': images, 'outputs': ypreds, 'target': ytrues]
-        
+
 
 def load_config(config_path):
     with open(config_path, 'r') as f:
@@ -278,7 +284,7 @@ def train_bowl(dash, config, paths, fn_mapping, plot_images, save_path, log_path
         #    api.log('result saved to ' + result_dict['output_path'])
         #    # if step%10==0:
         #    asyncio.ensure_future(plot_images(result_dict['name'], {'input image': result_dict['input_path'], 'predicted mask': result_dict['output_path']}))
-        
+
         #keval = FullImageEvaluator(config, ds, test=True, flips=3, step_callback=step_callback,  num_workers=num_workers, border=0)
         #fold =  0
 
@@ -289,8 +295,8 @@ def train_bowl(dash, config, paths, fn_mapping, plot_images, save_path, log_path
             # merge_files(keval.save_dir)
             # model.train()
         trainer.fit(train_loader, val_loader, config.nb_epoch)
-        
-    
+
+
     except:
         api.alert('Failed to train model')
         raise
@@ -319,7 +325,7 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_fa
         asyncio.ensure_future(plot_images(result_dict['name'], {'input image': result_dict['input_path'], 'predicted mask': result_dict['output_path']}))
     keval = FullImageEvaluator(config, ds, test=test, flips=3, step_callback=step_callback,  num_workers=num_workers, border=0)
     fold =  0
-    
+
     try:
         keval.predict(model_path, val_indexes, ('fold' + str(fold) + "_") if test else "")
         merge_files(keval.save_dir)
@@ -327,7 +333,7 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_fa
         raise
     finally:
         dash.setLoading({'status_text': 'Prediction Done.', 'loading': False})
-    
+
 
 
 def postprocessing(test_dir, step_callback):
@@ -352,12 +358,12 @@ class ImJoyPlugin():
         self.dialog = None
     async def run(self, ctx):
         self.dialog = await api.showDialog(type='launchpad', data= [
-                {'name': 'Load trained model', 'description': 'Load a pre-trained model', 'callback': self.load_model, 'img': 'https://img.icons8.com/ios-glyphs/48/000000/submit-progress.png'},
+                {'name': 'Load trained model', 'description': 'Load a pre-trained model', 'callback': self.load_model, 'img': 'https://img.icons8.com/ios-glyphs/90/000000/upload.png'},
                 {'name': 'Annotate images', 'description': 'Start annotation of images.', 'callback': self.start_annotation, 'img': 'https://img.icons8.com/color/96/000000/edit.png'},
                 {'name': 'Generate masks', 'description': 'Generate masks from annotations for training.', 'callback': self.generate_masks, 'img': 'https://img.icons8.com/color/96/000000/metamorphose.png'},
                 {'name': 'Train with data from the engine', 'description': 'Use training data stored on a (local or remote) plugin engine.', 'callback': self.train, 'img': 'https://img.icons8.com/color/96/000000/services.png'},
                 {'name': 'Predict', 'description': 'Segment nuclei in images.', 'callback': self.predict, 'img': 'https://img.icons8.com/color/96/000000/double-right.png'},
-                {'name': 'Export trained model', 'description': 'Export the model', 'callback': self.export_model, 'img': 'https://img.icons8.com/ios-glyphs/48/000000/submit-progress.png'},
+                {'name': 'Export trained model', 'description': 'Export the model', 'callback': self.export_model, 'img': 'https://img.icons8.com/material/96/000000/circled-down.png'},
                 {'name': 'Documentation', 'description': 'Show documentation.', 'callback': self.show_docs, 'img': 'https://img.icons8.com/color/96/000000/help.png'},
              ]
         )
@@ -386,11 +392,11 @@ class ImJoyPlugin():
             await self.dash.appendDisplay(label, displays)
         except Exception as e:
             api.log('error: '+str(e))
-    
+
     async def load_model(self):
         #if self.dialog is not None:
         #    self.dialog.close()
-    
+
         workdirObj = await api.showFileDialog(type='file', name="Please select your model folder (typically named `fold0_best.pth`)", root=os.path.join(ROOT_DIR, "SEGMENTATION-MODELS"), engine=api.ENGINE_URL)
         if workdirObj:
             try:
@@ -439,7 +445,7 @@ class ImJoyPlugin():
         # scale_factor = await api.prompt('What is the average nuclei size in your image in pixel?', 20)
         scale_factor = 20.0/float(options.nuclei_size)
         api.log('using scale factor = ', scale_factor)
-    
+
         paths, fn_mapping  = load_path_mapping(config, False)
         model_path = os.path.join('..', 'weights', 'dpn_softmax_f0', 'fold0_best.pth') # '../weights/dpn_softmax_f0/fold0_best.pth'
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all'})
