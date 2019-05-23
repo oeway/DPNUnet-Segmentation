@@ -6,7 +6,7 @@
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.26",
+  "version": "0.1.27",
   "description": "[TODO: describe this plugin with one sentence.]",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -283,12 +283,12 @@ def train_bowl(dash, config, paths, fn_mapping, plot_images, save_path, log_path
         #fold =  0
 
 
-        for i in range(config.nb_epoch):
+        #for i in range(config.nb_epoch):
             # model.eval()
             # keval.predict(model, val_idx, 'training_val_' )
             # merge_files(keval.save_dir)
             # model.train()
-            trainer.fit(train_loader, val_loader, 1)
+        trainer.fit(train_loader, val_loader, config.nb_epoch)
         
     
     except:
