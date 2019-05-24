@@ -26,14 +26,14 @@ Plugins for annotation, prediction, and training are provided.
     "GPU": ["conda create -n dsb2018-gpu python=3.6.8"]
   },
   "requirements": {"CPU": ["pip: descartes palettable geojson read-roi gputil namedlist",
-                           "pip: lightgbm imgaug scipy==1.0.0 pandas",
-                           "conda: opencv tqdm",
+                           "pip: lightgbm imgaug pandas",
+                           "conda: opencv tqdm scipy=1.0.0",
                            "conda: pytorch=0.4.1 -c pytorch",
                            "pip: torchvision tensorboardX",
                            "repo: https://github.com/oeway/DPNUnet-Segmentation"],
                     "GPU": ["pip: descartes palettable geojson read-roi gputil namedlist",
-                           "pip: lightgbm imgaug scipy==1.0.0 pandas",
-                           "conda: opencv tqdm",
+                           "pip: lightgbm imgaug pandas",
+                           "conda: opencv tqdm scipy=1.0.0",
                            "conda: pytorch=0.4.1 cuda90 -c pytorch",
                            "pip: torchvision tensorboardX",
                            "repo: https://github.com/oeway/DPNUnet-Segmentation"]
