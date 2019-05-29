@@ -1,4 +1,4 @@
-<docs lang="markdown">
+﻿<docs lang="markdown">
 Plugin framework for nuclear segmentation based on the winning approach (DPNUnet) of the 2018 Kaggle Data Science Bowl.
 
 Plugins for annotation, prediction, and training are provided.
@@ -11,7 +11,7 @@ Plugins for annotation, prediction, and training are provided.
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.33",
+  "version": "0.1.34",
   "description": "Nuclei segmentation with deep learning.",
   "tags": ["CPU", "GPU"],
   "ui": "",
@@ -354,11 +354,6 @@ def postprocessing(test_dir, step_callback):
         if step_callback:
             step_callback({'name': id_, 'step': n, 'total': total})
 
-if os.path.exists('/imjoy/imjoy-paper'):
-    ROOT_DIR = '/imjoy/imjoy-paper'
-else:
-    ROOT_DIR = ''
-
 class ImJoyPlugin():
     def __init__(self):
         self.dialog = None
@@ -388,13 +383,13 @@ class ImJoyPlugin():
                     'w':30, 'h':20,
                     'data': {
                         'tabs': [
-                            {'name': 'summary', 'content': await api.getAttachment('summary')},
-                            {'name': 'model', 'content': await api.getAttachment('model')},
-                            {'name': 'data', 'content': await api.getAttachment('data')},
-                            {'name': 'annotation', 'content': await api.getAttachment('annotation')},
-                            {'name': 'training', 'content': await api.getAttachment('training')},
-                            {'name': 'prediction', 'content': await api.getAttachment('prediction')},
-                            {'name': 'faq', 'content': await api.getAttachment('faq')}
+                            {'name': 'Summary', 'content': await api.getAttachment('summary')},
+                            {'name': 'Model', 'content': await api.getAttachment('model')},
+                            {'name': 'Data', 'content': await api.getAttachment('data')},
+                            {'name': 'Annotation', 'content': await api.getAttachment('annotation')},
+                            {'name': 'Training', 'content': await api.getAttachment('training')},
+                            {'name': 'Prediction', 'content': await api.getAttachment('prediction')},
+                            {'name': 'FAQ', 'content': await api.getAttachment('faq')}
                         ]
                     }
             })
@@ -455,7 +450,7 @@ class ImJoyPlugin():
         options = await api.showDialog( name="Prediction Configurations", ui= "<br>".join([
         #"Image file name { id: 'image_file_name', type:'string', placeholder: 'nuclei.png'}",
         #"Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_border_mask.png'}",
-         "Average nuclei size { id: 'nuclei_size', type:'number', placeholder: 20}",
+         "Average nuclei size { id: 'nuclei_size', type:'number', placeholder: 200}",
         ]))
         config = load_config('configs/imjoy_dpn_softmax_s2.json')
         ret = await api.showFileDialog(title="Please select a folder containing your testing data ( folder with a subfolder called `test`).", root='/imjoy/imjoy-paper/SEGMENTATION-DATA', type= 'directory', engine= api.ENGINE_URL)
@@ -524,7 +519,7 @@ class ImJoyPlugin():
     async def generate_masks(self):
         if self.dialog is not None:
             self.dialog.close()
-        ret = await api.showFileDialog(root='/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1', type="directory")
+        ret = await api.showFileDialog(root='/imjoy/imjoy-paper/SEGMENTATION-DATA', type="directory")
         datasets_dir = ret.path
         print("datasets_dir:", datasets_dir)
         file_ids = os.listdir(os.path.join(datasets_dir, "train"))
@@ -666,8 +661,15 @@ found in the respective section.
 
 <attachment name="data">
 <br>
-<p style="color:#FF0000"> FOR IMJOY REVIEWERS: when using the provided remote engine 'imjoy.pasteur.cloud', 
-  you have training data already available at 'imjoy/imjoy-paper/SEGMENTATION-DATA/HeLa_DAPI_v1'. 
+<p style="color:#FF0000"> 
+FOR IMJOY REVIEWERS: when using the provided remote engine 'imjoy.pasteur.cloud', 
+the two data-set available containing  annotated training data with masks, as well as test data.: 
+(1) HeLa cells ('imjoy/imjoy-paper/SEGMENTATION-DATA/HeLa_DAPI_v1'), (2) 
+full data-set of the original DPNUnet ('/imjoy/imjoy-paper/data-science-bowl/dsb2018-dataset-v0.1.1'). Both data-sets 
+ 
+These data can be used to test every step in the analysis workflow. To get started, we recommend using
+the smaller HeLa data-set for faster computations. 
+
 </p>
 <br>
 <p id="data-requirements">
