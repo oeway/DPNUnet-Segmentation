@@ -1,4 +1,4 @@
-﻿<docs lang="markdown">
+<docs lang="markdown">
 Plugin framework for nuclear segmentation based on the winning approach (DPNUnet) of the 2018 Kaggle Data Science Bowl.
 
 Plugins for annotation, prediction, and training are provided.
@@ -49,10 +49,8 @@ Plugins for annotation, prediction, and training are provided.
 <script lang="python">
 from imjoy import api
 import os
-if os.path.exists('/imjoy/imjoy-paper/data-science-bowl/DPNUnet-segmentation-imjoy/src'):
-    os.chdir('/imjoy/imjoy-paper/data-science-bowl/DPNUnet-segmentation-imjoy/src')
-else:
-    os.chdir('DPNUnet-Segmentation/src')
+os.chdir('DPNUnet-Segmentation/src')
+
 if api.TAG == 'GPU':
     import GPUtil
     # Get the first available GPU
