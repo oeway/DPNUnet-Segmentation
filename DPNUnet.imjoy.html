@@ -319,7 +319,7 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_fa
     im_prov_type = InFolderImageProvider if test else ReadingImageProvider
     ds = im_prov_type(im_val_type, paths, fn_mapping, scale_factor=scale_factor)
     num_workers = 0 # if os.name == 'nt' else 4
-    api.showStatus('start prediction ...')
+    api.showStatus('Start prediction ...')
     dash.setLoading({'status_text': 'Start Prediction...', 'loading': True})
 
     step =0
@@ -338,7 +338,8 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_fa
     except Exception as e:
         raise
     finally:
-        dash.setLoading({'status_text': 'Prediction Done.', 'loading': False})
+        api.showStatus('Prediction successfully performed.')
+        dash.setLoading({'status_text': 'Prediction successfully performed.', 'loading': False})
 
 
 
@@ -393,7 +394,6 @@ class ImJoyPlugin():
                         ]
                     }
             })
-            #await self.win_docs.selectTab('faq')
 
     async def plot_images(self, label, images):
         try:
@@ -472,17 +472,23 @@ class ImJoyPlugin():
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all'})
         await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping, model_path, self.plot_images,scale_factor)
 
-
         await api.showStatus('Start post-processing...')
+
         def callback(result):
             step = result['step']
             total = result['total']
             name = result['name']
-            if step %10 == 0:
-                api.showProgress(step/total*100)
-                api.showStatus(f'Processing {step}/{total}: {name}')
 
+            if total > 100:
+                if step %10 == 0:
+                    api.showProgress(step/total*100)
+                    api.showStatus(f'Processing {step+1}/{total}: {name}')
+            else:
+                api.showProgress(step/total*100)
+                api.showStatus(f'Processing {step+1}/{total}: {name}')
+                        
         postprocessing(config.dataset_path, callback)
+        api.showStatus(f'Post-processing finished.')  
 
         await api.showProgress(100)
         api.alert(f'Prediction done, generated masks saved to {config.dataset_path}')
