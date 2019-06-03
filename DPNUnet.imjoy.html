@@ -457,9 +457,8 @@ class ImJoyPlugin():
             return
 
         ret = await api.showFileDialog(title="Please select a folder containing your testing data ( folder with a subfolder called `test`).", root='/imjoy/imjoy-paper/SEGMENTATION-DATA', type= 'directory', engine= api.ENGINE_URL)
-
-        #if not ret:
-        #    return
+        if not ret:
+            return
         #elif 'HeLa_DAPI' in ret.path:
         #    options_string =  "Average nuclei size { id: 'nuclei_size', type:'number', placeholder: 200}"
         #else:
