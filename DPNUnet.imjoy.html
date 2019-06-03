@@ -71,7 +71,7 @@ else:
     api.alert('WARNING: you are running the plugin in CPU mode, training will be slow.')
 
 if sys.platform == "darwin" or sys.platform == "win32" or sys.platform == "win64":
-    api.alert('Plugin was only tested for GPU usage under LINUX. Issues on other platforms might arise.')
+    api.alert('This plugin was only tested under LINUX with GPU. Issues on other platforms might arise.')
 
 import asyncio
 from imjoy import api
