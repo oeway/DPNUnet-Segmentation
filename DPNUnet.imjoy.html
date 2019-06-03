@@ -70,7 +70,7 @@ else:
     api.log('Using CPU mode.')
     api.alert('WARNING: you are running the plugin in CPU mode, training will be slow.')
 
-if sys.platform == "darwin" or sys.platform == "win32" or sys.platform == "win64":
+if not sys.platform.startswith('linux'):
     api.alert('This plugin was only tested under LINUX with GPU. Issues on other platforms might arise.')
 
 import asyncio
