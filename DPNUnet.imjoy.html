@@ -467,7 +467,7 @@ class ImJoyPlugin():
         #scale_factor = 20.0/float(options.nuclei_size)
         config = load_config('configs/imjoy_dpn_softmax_s2.json')
         config.dataset_path = os.path.join(ret.path, 'test')
-        config.results_dir  = os.path.join(ret.path, 'results')
+        config.results_dir  = os.path.join(ret.path, '__outputs__')
         config.batch_size = 16
         config.epoch_size = 24
 
