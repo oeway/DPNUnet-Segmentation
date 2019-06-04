@@ -11,7 +11,7 @@ Plugins for annotation, prediction, and training are provided.
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Nuclei segmentation with deep learning.",
   "tags": ["GPU"],
   "ui": "",
@@ -126,6 +126,10 @@ if os.path.exists('/imjoy/imjoy-paper'):
 else:
     ROOT_DIR = ''
 
+import random
+from matplotlib import cm
+jet_colors = [cm.jet(i)[:3] for i in range(256)]
+random.shuffle(jet_colors)
 
 loop = asyncio.get_event_loop()
 
@@ -328,6 +332,7 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_fa
     api.showStatus('Start prediction ...')
     dash.setLoading({'status_text': 'Start Prediction...', 'loading': True})
 
+    
     step =0
     def step_callback(result_dict):
         if step>2:
@@ -342,7 +347,7 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_fa
     
         base_path, _ = os.path.splitext(result_dict['output_path'])
         cv2.imwrite(base_path + '_labels.png', label_image.astype('uint16'))
-        image_label_overlay = label2rgb(label_image, bg_label=0, bg_color=(0.8, 0.8, 0.8), colors=palettable.colorbrewer.diverging.Spectral_10.mpl_colors)
+        image_label_overlay = label2rgb(label_image, bg_label=0, bg_color=(0.8, 0.8, 0.8), colors=jet_colors)
         # image_label_overlay = cv2.resize(image_label_overlay, (0, 0), fx=0.5, fy=0.5)
         cv2.imwrite(base_path + '_color_labels.png', bytescale(image_label_overlay).astype('uint8'))
 
