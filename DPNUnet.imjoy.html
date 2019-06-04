@@ -11,7 +11,7 @@ Plugins for annotation, prediction, and training are provided.
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.37",
+  "version": "0.1.38",
   "description": "Nuclei segmentation with deep learning.",
   "tags": ["GPU"],
   "ui": "",
@@ -400,10 +400,11 @@ class ImJoyPlugin():
         try:
             displays = {}
             for k in images:
-                with open(images[k], "rb") as image_file:
-                    img_str = base64.b64encode(image_file.read()).decode('ascii')
-                imgurl = 'data:image/png;base64,' + img_str
-                displays[k] = imgurl
+                if images[k].endswith('png'):
+                    with open(images[k], "rb") as image_file:
+                        img_str = base64.b64encode(image_file.read()).decode('ascii')
+                    imgurl = 'data:image/png;base64,' + img_str
+                    displays[k] = imgurl
             await self.dash.appendDisplay(label, displays)
         except Exception as e:
             api.log('error: '+str(e))
@@ -474,7 +475,9 @@ class ImJoyPlugin():
         scale_factor = 1
         api.log('using scale factor = ', scale_factor)
 
-        config.image_file_name = await api.prompt('What is the image file name?', 'nuclei.png')
+        image_file_name = await api.prompt('What is the image file name?', 'nuclei.png')
+ 
+        config.image_file_name = str(image_file_name)
 
         paths, fn_mapping  = load_path_mapping(config, False)
 
