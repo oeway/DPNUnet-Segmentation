@@ -44,7 +44,11 @@ class RawImageType(AbstractImageType):
 
     def read_mask(self):
         path = os.path.join(self.paths['masks'], self.fn_mapping['masks'](self.fn))
-        mask = imread(path, mode='L')
+        if path.lower().endswith('.tif') or path.lower().endswith('.tiff'):
+            mask = imread(path)
+        else:
+            mask = imread(path, pilmode='L')
+        
         if self.scale_factor != 1.0:
             width, height, _ = self.im.shape
             mask= imresize(mask (width, height), interp='bicubic')
