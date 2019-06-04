@@ -3,6 +3,7 @@ from scipy.misc import imresize, bytescale
 from imageio import imread
 import cv2
 import glob
+import numpy as np
 
 from dataset.abstract_image_type import AbstractImageType, AlphaNotAvailableException
 
