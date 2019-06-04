@@ -2,6 +2,7 @@ import os
 from scipy.misc import imresize, bytescale
 from imageio import imread
 import cv2
+import glob
 
 from dataset.abstract_image_type import AbstractImageType, AlphaNotAvailableException
 
@@ -10,6 +11,18 @@ class RawImageType(AbstractImageType):
     def __init__(self, paths, fn, fn_mapping, has_alpha, scale_factor=1.0):
         super().__init__(paths, fn, fn_mapping, has_alpha, scale_factor=scale_factor)
         fpath = os.path.join(self.paths['images'], self.fn_mapping['images'](self.fn))
+        _, fname = os.path.split(fpath)
+        if "*" in fname:
+            files = glob.glob(fpath)
+            assert len(files) == 1, 'Multiple files match the image file name pattern, please use a unique pattern.'
+            fpath = files[0]
+            lfpath = fpath.lower()
+            if not lfpath.endswith('.jpg') and not lfpath.endswith('.jpeg')
+                and not lfpath.endswith('.png') 
+                and not lfpath.endswith('.tif') and not lfpath.endswith('.tiff')
+                and not lfpath.endswith('.bmp') and not lfpath.endswith('.gif'):
+                raise Exception('Unsupported file format: ' + fname)
+    
         if fpath.lower().endswith('.tif') or fpath.lower().endswith('.tiff'):
             img = imread(fpath)
         else:
