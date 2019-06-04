@@ -1,5 +1,6 @@
 import os
-from scipy.misc import imread, imresize
+from scipy.misc import imresize, bytescale
+from imageio import imread
 import cv2
 
 from dataset.abstract_image_type import AbstractImageType, AlphaNotAvailableException
@@ -8,7 +9,23 @@ from dataset.abstract_image_type import AbstractImageType, AlphaNotAvailableExce
 class RawImageType(AbstractImageType):
     def __init__(self, paths, fn, fn_mapping, has_alpha, scale_factor=1.0):
         super().__init__(paths, fn, fn_mapping, has_alpha, scale_factor=scale_factor)
-        self.im = imread(os.path.join(self.paths['images'], self.fn_mapping['images'](self.fn)), mode='RGB')
+        fpath = os.path.join(self.paths['images'], self.fn_mapping['images'](self.fn))
+        if fpath.lower().endswith('.tif') or fpath.lower().endswith('.tiff'):
+            img = imread(fpath)
+        else:
+            img = imread(fpath, pilmode="RGB")
+        
+        if len(img.shape) == 2:
+            rgb_img = np.stack((img,)*3, axis=-1)
+        else:
+            assert len(img.shape) == 3
+            # has alpha channel?
+            if img.shape[2] == 4:
+                rgb_img = img[:, :, :-1]
+            else:
+                rgb_img = img
+    
+        self.im = bytescale(rgb_img)
 
         if '646f5e00a2db3add97fb80a83ef3c07edd1b17b1b0d47c2bd650cdcab9f322c0' in fn:
             self.im = cv2.imread(os.path.join(self.paths['images'], self.fn), cv2.IMREAD_COLOR)
