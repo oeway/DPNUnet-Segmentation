@@ -11,7 +11,7 @@ Plugins for annotation, prediction, and training are provided.
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.36",
+  "version": "0.1.37",
   "description": "Nuclei segmentation with deep learning.",
   "tags": ["GPU"],
   "ui": "",
@@ -474,11 +474,15 @@ class ImJoyPlugin():
         scale_factor = 1
         api.log('using scale factor = ', scale_factor)
 
+        config.image_file_name = await api.prompt('What is the image file name?', 'nuclei.png')
+
         paths, fn_mapping  = load_path_mapping(config, False)
 
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all'})
-        await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping, model_path, self.plot_images,scale_factor)
-
+        try:
+            await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping, model_path, self.plot_images,scale_factor)
+        except Exception as e:
+            api.alert(f'Error occured: {e}')
         await api.showStatus('Start post-processing...')
 
         def callback(result):
