@@ -11,7 +11,7 @@ Plugins for annotation, prediction, and training are provided.
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.1.38",
+  "version": "0.2.0",
   "description": "Nuclei segmentation with deep learning.",
   "tags": ["GPU"],
   "ui": "",
@@ -96,6 +96,11 @@ import cv2
 from scipy.misc import imread
 import base64
 from shutil import copyfile
+
+from scipy.misc import bytescale
+from skimage.measure import label, regionprops
+import palettable
+from skimage.color import label2rgb
 
 import argparse
 
@@ -329,7 +334,16 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_fa
             dash.setLoading({'status_text': 'Start prediction: ' + result_dict['name'], 'loading': False})
         api.log('result saved to ' + result_dict['output_path'])
         #if step%10==0:
-        asyncio.ensure_future(plot_images(result_dict['name'], {'input image': result_dict['input_path'], 'predicted mask': result_dict['output_path']}))
+        out_img = imread(result_dict['output_path'])
+        # out_img = cv2.resize(out_img, (0, 0), fx=2, fy=2)
+        label_image = wsh(out_img[...,2] / 255., 0.3, 1 - out_img[...,1] / 255., out_img[...,2] / 255)
+        base_path, _ = os.path.splitext(result_dict['output_path'])
+        cv2.imwrite(base_path + '_labels.png', bytescale(label_image).astype('uint8'))
+        image_label_overlay = label2rgb(label_image, bg_label=0, bg_color=(0.8, 0.8, 0.8), colors=palettable.colorbrewer.diverging.Spectral_10.mpl_colors)
+        # image_label_overlay = cv2.resize(image_label_overlay, (0, 0), fx=0.5, fy=0.5)
+        cv2.imwrite(base_path + '_color_labels.png', bytescale(image_label_overlay).astype('uint8'))
+
+        asyncio.ensure_future(plot_images(result_dict['name'], {'input image': result_dict['input_path'], 'predicted mask': result_dict['output_path'], 'predicted labels': base_path + '_color_labels.png'}))
     keval = FullImageEvaluator(config, ds, test=test, flips=3, step_callback=step_callback,  num_workers=num_workers, border=0)
     fold =  0
 
@@ -343,16 +357,17 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_fa
         dash.setLoading({'status_text': 'Prediction successfully performed.', 'loading': False})
 
 
-
 def postprocessing(test_dir, step_callback):
     im_names = os.listdir(test_dir)
     test_ids = [os.path.splitext(i)[0] for i in im_names]
     total = len(test_ids)
     preds_test = [imread(os.path.join(test_dir, im, 'nuclei_border_mask_output.png'), mode='RGB') for im in im_names]
     for n, id_ in enumerate(test_ids):
-        print(os.path.join(test_dir, im_names[n], 'nuclei_border_mask_output_watershed.png'))
-        test_img = wsh(preds_test[n][...,2] / 255., 0.3, 1 - preds_test[n][...,1] / 255., preds_test[n][...,2] / 255)
-        cv2.imwrite(os.path.join(test_dir, im_names[n], 'nuclei_border_mask_output_watershed.png'), (test_img > 0).astype(np.uint8) * 255)
+        out_img = cv2.resize(preds_test[n], (0, 0), fx=2, fy=2)
+        label_image = wsh(out_img[...,2] / 255., 0.3, 1 - out_img[...,1] / 255., out_img[...,2] / 255)
+        image_label_overlay = label2rgb(label_image, bg_label=0, bg_color=(0.8, 0.8, 0.8), colors=palettable.colorbrewer.sequential.YlGn_9.mpl_colors)
+        image_label_overlay = cv2.resize(image_label_overlay, (0, 0), fx=0.5, fy=0.5)
+        cv2.imwrite(os.path.join(test_dir, im_names[n], 'nuclei_border_mask_output_color.png'), bytescale(image_label_overlay).astype('uint8'))
         if step_callback:
             step_callback({'name': id_, 'step': n, 'total': total})
 
@@ -501,8 +516,8 @@ class ImJoyPlugin():
                 api.showProgress(step/total*100)
                 api.showStatus(f'Processing {step+1}/{total}: {name}')
 
-        postprocessing(config.dataset_path, callback)
-        api.showStatus(f'Post-processing finished.')
+        #postprocessing(config.dataset_path, callback)
+        #api.showStatus(f'Post-processing finished.')
 
         await api.showProgress(100)
         api.alert(f'Prediction done, generated masks saved to {config.dataset_path}')
