@@ -17,10 +17,7 @@ class RawImageType(AbstractImageType):
             assert len(files) == 1, 'Multiple files match the image file name pattern, please use a unique pattern.'
             fpath = files[0]
             lfpath = fpath.lower()
-            if not lfpath.endswith('.jpg') and not lfpath.endswith('.jpeg')
-                and not lfpath.endswith('.png') 
-                and not lfpath.endswith('.tif') and not lfpath.endswith('.tiff')
-                and not lfpath.endswith('.bmp') and not lfpath.endswith('.gif'):
+            if not lfpath.endswith('.jpg') and not lfpath.endswith('.jpeg') and not lfpath.endswith('.png') and not lfpath.endswith('.tif') and not lfpath.endswith('.tiff') and not lfpath.endswith('.bmp') and not lfpath.endswith('.gif'):
                 raise Exception('Unsupported file format: ' + fname)
     
         if fpath.lower().endswith('.tif') or fpath.lower().endswith('.tiff'):
