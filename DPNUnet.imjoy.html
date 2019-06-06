@@ -357,11 +357,12 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_fa
         fold =  0
         keval.predict(model_path, val_indexes, ('fold' + str(fold) + "_") if test else "")
         merge_files(keval.save_dir)
-    except Exception as e:
-        raise
-    finally:
         api.showStatus('Prediction successfully performed.')
         dash.setLoading({'status_text': 'Prediction successfully performed.', 'loading': False})
+    except Exception as e:
+        api.showStatus('Failed to perform prediction.')
+        dash.setLoading({'status_text': 'Failed to perform prediction.', 'loading': False})
+        raise
 
 
 def postprocessing(test_dir, step_callback):
