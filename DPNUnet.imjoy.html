@@ -1,4 +1,4 @@
-<docs lang="markdown">
+﻿<docs lang="markdown">
 Plugin framework for nuclear segmentation based on the winning approach (DPNUnet) of the 2018 Kaggle Data Science Bowl.
 
 Plugins for annotation, prediction, and training are provided.
@@ -11,7 +11,7 @@ Plugins for annotation, prediction, and training are provided.
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Nuclei segmentation with deep learning.",
   "tags": ["GPU"],
   "ui": "",
@@ -360,7 +360,7 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_fa
         api.showStatus('Prediction successfully performed.')
         dash.setLoading({'status_text': 'Prediction successfully performed.', 'loading': False})
     except Exception as e:
-        api.showStatus('Failed to perform prediction.')
+        api.showStatus('Failed to perform prediction. Try to reconnect plugin and relaunch prediction.')
         dash.setLoading({'status_text': 'Failed to perform prediction.', 'loading': False})
         raise
 
@@ -592,13 +592,12 @@ api.export(ImJoyPlugin())
 
 The segmentation is perform by the winning approach (DPNUnet) of the 2018 Kaggle Data Science Bowl.
 
-* **Description of DPNUnet**: <a onclick="api.utils.openUrl('https://www.kaggle.com/c/data-science-bowl-2018/discussion/54741')">https://www.kaggle.com/c/data-science-bowl-2018/discussion/54741</a>,
-Nature Methods, 2018
+* **Description of DPNUnet**: <a onclick="api.utils.openUrl('https://www.kaggle.com/c/data-science-bowl-2018/discussion/54741')">https://www.kaggle.com/c/data-science-bowl-2018/discussion/54741</a>
 * **GitHub**: <a onclick="api.utils.openUrl('https://github.com/selimsef/dsb2018_topcoders/')">https://github.com/selimsef/dsb2018_topcoders/</a>
 
-DPNUnet has been **trained on very divergent biomedical data**, and will performs on many data-sets even without retraing.
-When peforming prediction, this pre-trained can be will be directly used (see secttion 'Model' for details). We also provide the possiblity to re-train this
-model, and use it for prediction after successful termination of the training.
+A model for DPNUnet has been **trained on very divergent biomedical data**, and will perform on many data-sets even without retraing.
+When peforming prediction, this pre-trained can be will be directly used (see secttion 'Model' for details). We also provide the 
+possiblity to re-train this model, and use it for prediction after successful termination of the training.
 
 When starting the DPNUnet-Segmentation plugin, you will see a **central launch pad** allowing to select the task to be performed:
 
@@ -880,21 +879,30 @@ is smaller and prediction will be faster.
 Prediction will be performed with best available model. This is either a loaded pre-trained model, or in case
 re-training yielded better resuls, the re-trained model. More details can be found in the section 'Model'.
 
+**To be sure that you use a certain model**, e.g. the pre-trained model from the Kaggle challenge, **please load this model prior to prediction**. 
+
 Please note that this model has been trained on nuclei with an **average size of 20 pixel**. For best performance,
 images should be rescaled such that the nuclei in the images are roughly this size.
 
 ## Perform prediction
 1. Press button `Predict`.
 0. Select a folder with test data (folder containing a subfolder 'test').
+0. Specify the name of the input images, default name is `nuclei.png`.
+<figure>
+    <img src="https://www.dropbox.com/s/q34dip0milx03iw/dpnunet-prediction-image-name.png?dl=1" width="300" class="img-responsive p-centered" alt="training-config">
+    <figcaption>Dialog to specify file-name of input images. </figcaption>
+</figure>
 0. Predicted data will then be shown in a dashboard, where you can use the slider to navigate the different samples.
 <figure>
-    <img src="https://www.dropbox.com/s/a2gphxu25p8e4yl/dpnunet-prediction-dashboard.png?dl=1" width="400" class="img-responsive p-centered" alt="training-config">
-    <figcaption>Inspecting the prediction results.</figcaption>
+    <img src="https://www.dropbox.com/s/a2gphxu25p8e4yl/dpnunet-prediction-dashboard.png?dl=1" width="500" class="img-responsive p-centered" alt="training-config">
+    <figcaption>Inspecting the prediction results. (Left) original image, (middle) predicted masks, (right) identified nuclei shown as labels. </figcaption>
 </figure>
 0. The predicted masks will be saved as `nuclei_border_mask_output.png` in each sample folder.
 0. To obtain the actual nuclei, a watershed segmentation is performed as follows: the predicted border is
  mask is substracted from the predicted filled mask. The resulting image is used as a seed for a watershed
- segmentation on the predicted filled mask. This image is saved as `nuclei_border_mask_output_watershed.png`.
+ segmentation on the predicted filled mask. After identifying the individual nuclei, the results are stored as 
+    * `nuclei_border_mask_output_labels.png`: image where each identified nuclei is a filled mask with a constant intensity value. 
+    * `nuclei_border_mask_output_color_labels.png`: label image shown with a color-lookup table for inspection. 
 
 </attachment>
 
