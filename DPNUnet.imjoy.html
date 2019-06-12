@@ -1,4 +1,4 @@
-﻿<docs lang="markdown">
+<docs lang="markdown">
 Plugin framework for nuclear segmentation based on the winning approach (DPNUnet) of the 2018 Kaggle Data Science Bowl.
 
 Plugins for annotation, prediction, and training are provided.
@@ -11,7 +11,7 @@ Plugins for annotation, prediction, and training are provided.
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Nuclei segmentation with deep learning.",
   "tags": ["GPU"],
   "ui": "",
@@ -28,14 +28,14 @@ Plugins for annotation, prediction, and training are provided.
   "requirements": {"CPU": ["pip: descartes palettable geojson read-roi gputil namedlist",
                            "pip: lightgbm imgaug pandas imageio",
                            "conda: opencv tqdm scipy=1.0.0",
-                           "conda: pytorch=0.4.1 -c pytorch",
-                           "pip: torchvision tensorboardX",
+                           "conda: pytorch=0.4.1 torchvision==0.2.0 -c pytorch",
+                           "pip: tensorboardX",
                            "repo: https://github.com/oeway/DPNUnet-Segmentation"],
                     "GPU": ["pip: descartes palettable geojson read-roi gputil namedlist",
                            "pip: lightgbm imgaug pandas imageio",
                            "conda: opencv tqdm scipy=1.0.0",
-                           "conda: pytorch=0.4.1 cuda90 -c pytorch",
-                           "pip: torchvision tensorboardX",
+                           "conda: pytorch=0.4.1 torchvision==0.2.0 cuda90 -c pytorch",
+                           "pip: tensorboardX",
                            "repo: https://github.com/oeway/DPNUnet-Segmentation"]
                    },
   "dependencies": ["oeway/ImJoy-Plugins:Im2Im-Dashboard",
