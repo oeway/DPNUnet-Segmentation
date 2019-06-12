@@ -11,7 +11,7 @@ Plugins for annotation, prediction, and training are provided.
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Nuclei segmentation with deep learning.",
   "tags": ["GPU"],
   "ui": "",
@@ -509,9 +509,9 @@ class ImJoyPlugin():
             await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping, model_path, self.plot_images,scale_factor)
         except Exception as e:
             api.alert(f'Error occured: {e}')
-        
-        await api.showProgress(100)
-        api.alert(f'Prediction done, generated masks saved to {config.dataset_path}')
+        else:
+            await api.showProgress(100)
+            api.alert(f'Prediction done, generated masks saved to {config.dataset_path}')
 
 
     async def train(self):
