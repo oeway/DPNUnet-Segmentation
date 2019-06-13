@@ -129,13 +129,13 @@ class GeojsonImporter(AnnotationImporter):
         roi_size_all = {}
 
         skipped = []
-        
+
         for feat_idx, feat in enumerate(data_json['features']):
-         
+
             if feat['geometry']['type'] not in ['Polygon', 'LineString']:
                 skipped.append(feat['geometry']['type'])
                 continue
-            
+
             key_annot = 'annot_'+str(feat_idx)
             annot_dict[key_annot] = {}
             annot_dict[key_annot]['type'] = feat['geometry']['type']
@@ -145,14 +145,14 @@ class GeojsonImporter(AnnotationImporter):
             # Store size of regions
             if not (feat['properties']['label'] in  roi_size_all):
                  roi_size_all[feat['properties']['label']] = []
-            
+
             roi_size_all[feat['properties']['label']].append (
                 [annot_dict[key_annot]['pos'][:, 0].max() -
                  annot_dict[key_annot]['pos'][:, 0].min(),
                  annot_dict[key_annot]['pos'][:, 1].max()
                  - annot_dict[key_annot]['pos'][:, 1].min()])
-    
-            
+
+
         print('Skipped geometry type(s):', skipped)
         return annot_dict, roi_size_all,self.image_size
 
@@ -318,13 +318,14 @@ class BinaryMaskGenerator(MaskGenerator):
                 # Save array for mask and edge
                 mask_fill[mask_fill_roi_erode] = 1
                 mask_edge[mask_edge_roi] = 1
-                mask_labels[mask_fill_roi_erode] = i_roi
+                mask_labels[mask_fill_roi_erode] = i_roi+1
 
                 if self.save_indiv is True:
                     mask_edge_indiv[:, :, i_roi] = mask_edge_roi.astype('bool')
                     mask_fill_indiv[
                         :, :, i_roi] = mask_fill_roi_erode.astype('bool')
-                    i_roi = i_roi + 1
+
+                i_roi = i_roi + 1
 
             else:
                 roi_type = roi['type']
@@ -506,7 +507,7 @@ class WeightedEdgeMaskGenerator(MaskGenerator):
 
         return mask_dict
 
-    
+
 class BorderMaskGenerator(MaskGenerator):
     '''
     https://github.com/selimsef/dsb2018_topcoders
@@ -517,7 +518,7 @@ class BorderMaskGenerator(MaskGenerator):
 
     def generate(self, annot_dict, mask_dict):
         labels = mask_dict['labels']
- 
+
         tmp = morphology.dilation(labels > 0, morphology.square(9))
         tmp2 = morphology.watershed(tmp, labels, mask=tmp, watershed_line=True) > 0
         tmp = tmp ^ tmp2
