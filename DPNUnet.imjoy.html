@@ -1,4 +1,4 @@
-<docs lang="markdown">
+﻿<docs lang="markdown">
 Plugin framework for nuclear segmentation based on the winning approach (DPNUnet) of the 2018 Kaggle Data Science Bowl.
 
 Plugins for annotation, prediction, and training are provided.
@@ -11,7 +11,7 @@ Plugins for annotation, prediction, and training are provided.
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "Nuclei segmentation with deep learning.",
   "tags": ["GPU"],
   "ui": "",
@@ -384,13 +384,16 @@ class ImJoyPlugin():
         self.dialog = None
         self.win_docs = None
 
+    def return_engine_url(self):
+        return api.ENGINE_URL
+
     async def run(self, ctx):
         self.dialog = await api.showDialog(type='launchpad', data= [
                 {'name': 'Load trained model', 'description': 'Load a pre-trained model', 'callback': self.load_model, 'img': 'https://img.icons8.com/ios-glyphs/90/000000/upload.png'},
                 {'name': 'Annotate images', 'description': 'Start annotation of images.', 'callback': self.start_annotation, 'img': 'https://img.icons8.com/color/96/000000/edit.png'},
                 {'name': 'Generate masks', 'description': 'Generate masks from annotations for training.', 'callback': self.generate_masks, 'img': 'https://img.icons8.com/color/96/000000/metamorphose.png'},
                 {'name': 'Train with data from the engine', 'description': 'Use training data stored on a (local or remote) plugin engine.', 'callback': self.train, 'img': 'https://img.icons8.com/color/96/000000/services.png'},
-                {'name': 'Predict', 'description': 'Segment nuclei in images.', 'callback': self.predict, 'img': 'https://img.icons8.com/color/96/000000/double-right.png'},
+                {'name': 'Predict', 'description': 'Segment nuclei in images.', 'callback': self.predict_default, 'img': 'https://img.icons8.com/color/96/000000/double-right.png'},
                 {'name': 'Export trained model', 'description': 'Export the model', 'callback': self.export_model, 'img': 'https://img.icons8.com/material/96/000000/circled-down.png'},
                 {'name': 'Documentation', 'description': 'Show documentation.', 'callback': self.show_docs, 'img': 'https://img.icons8.com/color/96/000000/help.png'},
              ]
@@ -470,7 +473,7 @@ class ImJoyPlugin():
             api.alert('No model available for exportting.')
 
 
-    async def predict(self):
+    async def predict_default(self):
         if self.dialog is not None:
             self.dialog.close()
 
@@ -513,7 +516,81 @@ class ImJoyPlugin():
             await api.showProgress(100)
             api.alert(f'Prediction done, generated masks saved to {config.dataset_path}')
 
+    async def predict(self,ctx):
+        '''
+        API function to perform nuclei segmentation on user provided data. 
+        Data has to be stored on the plugin engine where DPNUnet plugin is running.
+        Segmented nuclei will also be converted in GeoJson regions, and (if requested)
+        a download link with the zipped results be provided. 
 
+        Data has to be stored in the following format:
+        - Each image has to be in its own folder (sample folder)
+        - Sample folders must be stored in parental folder called 'test'
+        - Each image has to have the same name (e.g. 'nuclei.png')
+
+        Args:
+            ctx.data.data_path (string): folder containing data to be segmented (folder containing subfolder 'test').
+            ctx.data.image_file_name (string): name of images to be segmented.
+            ctx.data.zip_name (string): results can be provided as a zip archive. Specify name here, no zip is created when None. 
+
+        Returns:
+            results_url (string): url pointing to the zipped results of the segmentation
+        '''
+
+        # Get arguments
+        data_path =  ctx.data.data_path
+        image_file_name =  ctx.data.image_file_name
+        zip_name =  ctx.data.zip_name
+
+        # Check if model is imported
+        model_path = os.path.join('..', 'weights', 'dpn_softmax_f0', 'fold0_best.pth') # '../weights/dpn_softmax_f0/fold0_best.pth'
+        if not os.path.exists(model_path):
+            api.alert('No model found. Please import model before launching prediction.')
+            return
+
+        # Check if data path is present
+        if not os.path.exists(data_path):
+            api.alert('Data path does not exist. ')
+            return 
+
+        # Configuration for prediction    
+        config = load_config('configs/imjoy_dpn_softmax_s2.json')
+        config.image_file_name = image_file_name
+        config.dataset_path = os.path.join(data_path,'test')
+        config.results_dir  = os.path.join(data_path, '__outputs__')
+        config.batch_size = 16
+        config.epoch_size = 24
+        scale_factor = 1
+  
+        # Perform prediction
+        paths, fn_mapping  = load_path_mapping(config, False)
+        self.dash = await api.createWindow(type="Im2Im-Dashboard", name="DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all'})
+        try:
+            await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping, model_path, self.plot_images,scale_factor)
+        except Exception as e:
+            api.alert(f'Error occured: {e}')
+
+        # Create geojson 
+        for root, dirnames, filenames in os.walk(config.dataset_path):
+            for filename in filenames:
+                if 'border_mask_output_labels' in filename: 
+                    img_label = imread(os.path.join(root,filename))
+                    segmentationUtils.masks_to_polygon(img_label, label='nuclei', simplify_tol=0,
+                                               save_name=os.path.join(root, "annotation.json"))   
+
+        # Create ZIP of results
+        if zip_name:
+            output_filename =  os.path.join(data_path,zip_name)
+            zip_name_full = make_archive(output_filename, 'zip', config.dataset_path)
+            api.log(f'ZIP file with results saved at: {zip_name_full}')
+            results_url = await api.getFileUrl(path=os.path.abspath(zip_name_full), engine=api.ENGINE_URL)
+            await api.alert(content=f'Click <a href="{results_url}" target="_blank">here</a> to download the results as zip file. Link can also be found in plugin log.', title='Download results')
+        else:
+            results_url = None
+
+        return results_url
+
+        
     async def train(self):
         if self.dialog is not None:
             self.dialog.close()
