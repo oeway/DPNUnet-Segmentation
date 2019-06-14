@@ -1,5 +1,6 @@
 import threading
 import numpy as np
+
 import cv2
 cv2.setNumThreads(0)
 cv2.ocl.setUseOpenCL(False)
@@ -10,6 +11,36 @@ import json
 import pandas as pd
 
 import glob, os
+
+from zipfile import ZipFile
+import re
+
+# Zip the files from given directory that matches the filter
+def zip_dir_filter(dir_name, zip_Name, files_filter=None):
+    '''
+    Create zip file of folder. Folder will be recursively searched.
+    Allows to specify a list of regular expression to included file-names.
+    '''
+
+    with ZipFile(zip_Name, 'w') as zipObj:
+        # Iterate over all the files in directory
+        for foldername, subfolders, filenames in os.walk(dir_name):
+            for filename in filenames:
+
+                file_include = True
+
+                if files_filter:
+                    if [ True for file_filter in files_filter if re.search(file_filter, filename) ] == []:
+                        file_include = False
+
+                if file_include:
+                    filePath = os.path.join(foldername, filename)
+                    arcname = filePath.replace(dir_name,'')
+                    zipObj.write(filePath,arcname)
+
+    # close the Zip File
+    zipObj.close()
+
 
 def cleanup_mac_hidden_files(workdir):
     for root, dirs, files in os.walk(workdir):

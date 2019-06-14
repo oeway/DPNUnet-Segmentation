@@ -76,11 +76,14 @@ if not sys.platform.startswith('linux'):
 import asyncio
 from imjoy import api
 from geojson_utils import masks_to_annotation, gen_mask_from_geojson
+from imgseg import segmentationUtils
 from postprocessing import wsh
 import torch
 import os
 import numpy as np
 import random
+from zipfile import ZipFile
+import re
 
 from utils import get_csv_folds, update_config, get_folds, cleanup_mac_hidden_files
 from config import Config
@@ -95,7 +98,7 @@ import json
 import cv2
 from scipy.misc import imread
 import base64
-from shutil import copyfile
+from shutil import copyfile, make_archive
 
 from scipy.misc import bytescale
 from skimage.measure import label, regionprops
@@ -183,6 +186,43 @@ class UpdateUI(Callback):
         api.showStatus('training epoch:'+str(self.epoch)+'/'+str(self.total_epoch))
         api.log('epoch:'+str(self.epoch)+'/'+str(self.total_epoch) + ' '+ str(logs))
         #current_results['inputs': images, 'outputs': ypreds, 'target': ytrues]
+
+
+# Zip the files from given directory that matches the filter: MAYBE BE MOVED to utils
+def zip_dir(name_dir, name_zip, files_filter=None):
+        '''
+        Create zip file of folder. Folder will be recursively searched.
+        Allows to specify a list of regular expression to included file-names.
+        '''
+
+        try: 
+
+            with ZipFile(name_zip, 'w') as zipObj:
+                # Iterate over all the files in directory
+                for foldername, subfolders, filenames in os.walk(name_dir):
+                    for filename in filenames:
+
+                        file_include = True
+
+                        if files_filter:
+                            if [ True for file_filter in files_filter if re.search(file_filter, filename) ] == []:
+                                file_include = False
+
+                        if file_include:
+                            filePath = os.path.join(foldername, filename)
+                            arcname = filePath.replace(name_dir,'')
+                            api.log(filePath)
+                            api.log(arcname)                          
+                            zipObj.write(filePath,arcname)
+
+            # close the Zip File
+            zipObj.close()
+
+            return name_zip
+
+        except Exception as e:
+            api.alert(f'Error occurred: {e}')
+            return None
 
 
 def load_config(config_path):
@@ -486,37 +526,18 @@ class ImJoyPlugin():
         ret = await api.showFileDialog(title="Please select a folder containing your testing data ( folder with a subfolder called `test`).", root='/imjoy/imjoy-paper/SEGMENTATION-DATA', type= 'directory', engine= api.ENGINE_URL)
         if not ret:
             return
-        #elif 'HeLa_DAPI' in ret.path:
-        #    options_string =  "Average nuclei size { id: 'nuclei_size', type:'number', placeholder: 200}"
-        #else:
-        #    options_string =  "Average nuclei size { id: 'nuclei_size', type:'number', placeholder: 20}"
-        #options = await api.showDialog( name="Prediction Configurations", ui= "<br>".join([options_string   ]))
-        #scale_factor = 20.0/float(options.nuclei_size)
-        config = load_config('configs/imjoy_dpn_softmax_s2.json')
-        config.dataset_path = os.path.join(ret.path, 'test')
-        config.results_dir  = os.path.join(ret.path, '__outputs__')
-        config.batch_size = 16
-        config.epoch_size = 24
-
-        scale_factor = 1
-        api.log('using scale factor = ', scale_factor)
-
+        
         image_file_name = await api.prompt('What is the image file name?', 'nuclei.png')
- 
-        config.image_file_name = str(image_file_name)
+        if not image_file_name:
+            return
 
-        paths, fn_mapping  = load_path_mapping(config, False)
+        await self.predict({    'data_path': ret.path,
+                                'image_file_name': image_file_name,
+                                'name_json': None,
+                                'save_results': None,
+                })
 
-        self.dash = await api.createWindow(type="Im2Im-Dashboard", name="DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all'})
-        try:
-            await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping, model_path, self.plot_images,scale_factor)
-        except Exception as e:
-            api.alert(f'Error occured: {e}')
-        else:
-            await api.showProgress(100)
-            api.alert(f'Prediction done, generated masks saved to {config.dataset_path}')
-
-    async def predict(self,ctx):
+    async def predict(self,config):
         '''
         API function to perform nuclei segmentation on user provided data. 
         Data has to be stored on the plugin engine where DPNUnet plugin is running.
@@ -529,19 +550,28 @@ class ImJoyPlugin():
         - Each image has to have the same name (e.g. 'nuclei.png')
 
         Args:
-            ctx.data.data_path (string): folder containing data to be segmented (folder containing subfolder 'test').
-            ctx.data.image_file_name (string): name of images to be segmented.
-            ctx.data.zip_name (string): results can be provided as a zip archive. Specify name here, no zip is created when None. 
+            config['data_path'] (string): folder containing data to be segmented (folder containing subfolder 'test').
+            config['image_file_name'] (string): name of images to be segmented.
+            config['name_json'] (string): name of geojson files with outlines. Will be saved in each sample folder. 
+                                       Specify name WITH extension. No file is created when None. 
+            config['save_results'] (dictionary): specify how/if results are provided. 
+                                        'name_results' (string): name of results file
+                                        'files_filter' (list): regular expressions to filter files that are included. 
+                                                                See export_result for more details. 
 
         Returns:
             results_url (string): url pointing to the zipped results of the segmentation
         '''
+      
+        api.log(f'Provided config: {config}')
+        results_url = None
 
         # Get arguments
-        data_path =  ctx.data.data_path
-        image_file_name =  ctx.data.image_file_name
-        zip_name =  ctx.data.zip_name
-
+        data_path =  config['data_path']
+        image_file_name =  config['image_file_name']
+        name_json = config['name_json']
+        save_results =  config['save_results']
+        
         # Check if model is imported
         model_path = os.path.join('..', 'weights', 'dpn_softmax_f0', 'fold0_best.pth') # '../weights/dpn_softmax_f0/fold0_best.pth'
         if not os.path.exists(model_path):
@@ -554,42 +584,73 @@ class ImJoyPlugin():
             return 
 
         # Configuration for prediction    
-        config = load_config('configs/imjoy_dpn_softmax_s2.json')
-        config.image_file_name = image_file_name
-        config.dataset_path = os.path.join(data_path,'test')
-        config.results_dir  = os.path.join(data_path, '__outputs__')
-        config.batch_size = 16
-        config.epoch_size = 24
+        config_prediction = load_config('configs/imjoy_dpn_softmax_s2.json')
+        config_prediction.image_file_name = image_file_name
+        config_prediction.dataset_path = os.path.join(data_path,'test')
+        config_prediction.results_dir  = os.path.join(data_path, '__outputs__')
+        config_prediction.batch_size = 16
+        config_prediction.epoch_size = 24
         scale_factor = 1
   
         # Perform prediction
-        paths, fn_mapping  = load_path_mapping(config, False)
+        paths, fn_mapping  = load_path_mapping(config_prediction, False)
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all'})
         try:
-            await loop.run_in_executor(None, eval_bowl, self.dash, config, paths, fn_mapping, model_path, self.plot_images,scale_factor)
+            await loop.run_in_executor(None, eval_bowl, self.dash, config_prediction, paths, fn_mapping, model_path, self.plot_images,scale_factor)
         except Exception as e:
             api.alert(f'Error occured: {e}')
+        else:
+            await api.showProgress(100)            
+            string_info = f'Prediction finished!<br><br>Generated masks saved to {config_prediction.dataset_path}'
 
         # Create geojson 
-        for root, dirnames, filenames in os.walk(config.dataset_path):
-            for filename in filenames:
-                if 'border_mask_output_labels' in filename: 
-                    img_label = imread(os.path.join(root,filename))
-                    segmentationUtils.masks_to_polygon(img_label, label='nuclei', simplify_tol=0,
-                                               save_name=os.path.join(root, "annotation.json"))   
+        if name_json:
+            for root, dirnames, filenames in os.walk(config_prediction.dataset_path):
+                for filename in filenames:
+                    if 'border_mask_output_labels' in filename: 
+                        img_label = imread(os.path.join(root,filename))
+                        segmentationUtils.masks_to_polygon(img_label, label='nuclei', simplify_tol=0,
+                                                save_name=os.path.join(root, name_json))   
 
         # Create ZIP of results
-        if zip_name:
-            output_filename =  os.path.join(data_path,zip_name)
-            zip_name_full = make_archive(output_filename, 'zip', config.dataset_path)
-            api.log(f'ZIP file with results saved at: {zip_name_full}')
-            results_url = await api.getFileUrl(path=os.path.abspath(zip_name_full), engine=api.ENGINE_URL)
-            await api.alert(content=f'Click <a href="{results_url}" target="_blank">here</a> to download the results as zip file. Link can also be found in plugin log.', title='Download results')
-        else:
-            results_url = None
-
+        if save_results:
+            results_url = await self.export_result({ 
+                                'name_dir': config_prediction.dataset_path,
+                                'name_zip': os.path.join(data_path,save_results['name_results']),
+                                'files_filter': save_results['files_filter'],
+                           })
+            string_info = string_info + f'<br><br>Click <a href="{results_url}" target="_blank">here</a> to download the results as zip file. Link can also be found in plugin log.'
+        
+        #await api.alert(content=f'Click <a href="{results_url}" target="_blank">here</a> to download the results as zip file. Link can also be found in plugin log.', title='Download results')
+        await api.alert(content=string_info)
         return results_url
 
+        
+
+    async def export_result(self,config):
+        '''
+        Export zipped results as downloadable URL.
+
+        Args:
+            config['name_dir'] (string): folder containing results.
+            config['name_zip'] (string): full file name of zip archive containing results.
+            config['files_filter'] (list): list of regular expression to included certain files. All files are  included if None. 
+        
+        Returns:
+            results_url (string): URL with zipped results for download
+        '''
+
+        results_url = None
+
+        # Create zip
+        name_zip_returned = zip_dir(config['name_dir'],config['name_zip'],files_filter=config['files_filter'])
+        api.log(f'ZIP file with results (None if not successful): {name_zip_returned}')
+
+        if name_zip_returned:
+            results_url = await api.getFileUrl(path=os.path.abspath(name_zip_returned), engine=api.ENGINE_URL)
+            api.log(f'URL with results (None if not successful): {results_url}')
+            return results_url
+            
         
     async def train(self):
         if self.dialog is not None:
