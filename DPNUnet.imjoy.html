@@ -96,7 +96,7 @@ from pytorch_utils.train import train
 from merge_preds import merge_files
 import json
 import cv2
-from scipy.misc import imread
+from imageio import imread
 import base64
 from shutil import copyfile, make_archive
 
@@ -195,7 +195,7 @@ def zip_dir(name_dir, name_zip, files_filter=None):
         Allows to specify a list of regular expression to included file-names.
         '''
 
-        try: 
+        try:
 
             with ZipFile(name_zip, 'w') as zipObj:
                 # Iterate over all the files in directory
@@ -212,7 +212,7 @@ def zip_dir(name_dir, name_zip, files_filter=None):
                             filePath = os.path.join(foldername, filename)
                             arcname = filePath.replace(name_dir,'')
                             api.log(filePath)
-                            api.log(arcname)                          
+                            api.log(arcname)
                             zipObj.write(filePath,arcname)
 
             # close the Zip File
@@ -373,7 +373,7 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_fa
         api.showStatus('Start prediction ...')
         dash.setLoading({'status_text': 'Start Prediction...', 'loading': True})
 
-        
+
         step =0
         def step_callback(result_dict):
             if step>2:
@@ -385,7 +385,7 @@ def eval_bowl(dash, config, paths, fn_mapping, model_path, plot_images, scale_fa
             label_image = wsh(out_img[...,2] / 255., 0.3, 1 - out_img[...,1] / 255., out_img[...,2] / 255)
             propsa = regionprops(label_image)
             cell_count = len(propsa)
-        
+
             base_path, _ = os.path.splitext(result_dict['output_path'])
             cv2.imwrite(base_path + '_labels.png', label_image.astype('uint16'))
             image_label_overlay = label2rgb(label_image, bg_label=0, bg_color=(0.8, 0.8, 0.8), colors=jet_colors)
@@ -526,7 +526,7 @@ class ImJoyPlugin():
         ret = await api.showFileDialog(title="Please select a folder containing your testing data ( folder with a subfolder called `test`).", root='/imjoy/imjoy-paper/SEGMENTATION-DATA', type= 'directory', engine= api.ENGINE_URL)
         if not ret:
             return
-        
+
         image_file_name = await api.prompt('What is the image file name?', 'nuclei.png')
         if not image_file_name:
             return
@@ -539,10 +539,10 @@ class ImJoyPlugin():
 
     async def predict(self,config):
         '''
-        API function to perform nuclei segmentation on user provided data. 
+        API function to perform nuclei segmentation on user provided data.
         Data has to be stored on the plugin engine where DPNUnet plugin is running.
         Segmented nuclei will also be converted in GeoJson regions, and (if requested)
-        a download link with the zipped results be provided. 
+        a download link with the zipped results be provided.
 
         Data has to be stored in the following format:
         - Each image has to be in its own folder (sample folder)
@@ -552,17 +552,17 @@ class ImJoyPlugin():
         Args:
             config['data_path'] (string): folder containing data to be segmented (folder containing subfolder 'test').
             config['image_file_name'] (string): name of images to be segmented.
-            config['name_json'] (string): name of geojson files with outlines. Will be saved in each sample folder. 
-                                       Specify name WITH extension. No file is created when None. 
-            config['save_results'] (dictionary): specify how/if results are provided. 
+            config['name_json'] (string): name of geojson files with outlines. Will be saved in each sample folder.
+                                       Specify name WITH extension. No file is created when None.
+            config['save_results'] (dictionary): specify how/if results are provided.
                                         'name_results' (string): name of results file
-                                        'files_filter' (list): regular expressions to filter files that are included. 
-                                                                See export_result for more details. 
+                                        'files_filter' (list): regular expressions to filter files that are included.
+                                                                See export_result for more details.
 
         Returns:
             results_url (string): url pointing to the zipped results of the segmentation
         '''
-      
+
         api.log(f'Provided config: {config}')
         results_url = None
 
@@ -571,7 +571,7 @@ class ImJoyPlugin():
         image_file_name =  config['image_file_name']
         name_json = config['name_json']
         save_results =  config['save_results']
-        
+
         # Check if model is imported
         model_path = os.path.join('..', 'weights', 'dpn_softmax_f0', 'fold0_best.pth') # '../weights/dpn_softmax_f0/fold0_best.pth'
         if not os.path.exists(model_path):
@@ -581,9 +581,9 @@ class ImJoyPlugin():
         # Check if data path is present
         if not os.path.exists(data_path):
             api.alert('Data path does not exist. ')
-            return 
+            return
 
-        # Configuration for prediction    
+        # Configuration for prediction
         config_prediction = load_config('configs/imjoy_dpn_softmax_s2.json')
         config_prediction.image_file_name = image_file_name
         config_prediction.dataset_path = os.path.join(data_path,'test')
@@ -591,7 +591,7 @@ class ImJoyPlugin():
         config_prediction.batch_size = 16
         config_prediction.epoch_size = 24
         scale_factor = 1
-  
+
         # Perform prediction
         paths, fn_mapping  = load_path_mapping(config_prediction, False)
         self.dash = await api.createWindow(type="Im2Im-Dashboard", name="DPN-Unet Segmentation Model", w=25, h=10, data={'display_mode': 'all'})
@@ -600,32 +600,32 @@ class ImJoyPlugin():
         except Exception as e:
             api.alert(f'Error occured: {e}')
         else:
-            await api.showProgress(100)            
+            await api.showProgress(100)
             string_info = f'Prediction finished!<br><br>Generated masks saved to {config_prediction.dataset_path}'
 
-        # Create geojson 
+        # Create geojson
         if name_json:
             for root, dirnames, filenames in os.walk(config_prediction.dataset_path):
                 for filename in filenames:
-                    if 'border_mask_output_labels' in filename: 
+                    if 'border_mask_output_labels' in filename:
                         img_label = imread(os.path.join(root,filename))
                         segmentationUtils.masks_to_polygon(img_label, label='nuclei', simplify_tol=0,
-                                                save_name=os.path.join(root, name_json))   
+                                                save_name=os.path.join(root, name_json))
 
         # Create ZIP of results
         if save_results:
-            results_url = await self.export_result({ 
+            results_url = await self.export_result({
                                 'name_dir': config_prediction.dataset_path,
                                 'name_zip': os.path.join(data_path,save_results['name_results']),
                                 'files_filter': save_results['files_filter'],
                            })
             string_info = string_info + f'<br><br>Click <a href="{results_url}" target="_blank">here</a> to download the results as zip file. Link can also be found in plugin log.'
-        
+
         #await api.alert(content=f'Click <a href="{results_url}" target="_blank">here</a> to download the results as zip file. Link can also be found in plugin log.', title='Download results')
         await api.alert(content=string_info)
         return results_url
 
-        
+
 
     async def export_result(self,config):
         '''
@@ -634,8 +634,8 @@ class ImJoyPlugin():
         Args:
             config['name_dir'] (string): folder containing results.
             config['name_zip'] (string): full file name of zip archive containing results.
-            config['files_filter'] (list): list of regular expression to included certain files. All files are  included if None. 
-        
+            config['files_filter'] (list): list of regular expression to included certain files. All files are  included if None.
+
         Returns:
             results_url (string): URL with zipped results for download
         '''
@@ -650,8 +650,8 @@ class ImJoyPlugin():
             results_url = await api.getFileUrl(path=os.path.abspath(name_zip_returned), engine=api.ENGINE_URL)
             api.log(f'URL with results (None if not successful): {results_url}')
             return results_url
-            
-        
+
+
     async def train(self):
         if self.dialog is not None:
             self.dialog.close()
@@ -734,7 +734,7 @@ The segmentation is perform by the winning approach (DPNUnet) of the 2018 Kaggle
 * **GitHub**: <a onclick="api.utils.openUrl('https://github.com/selimsef/dsb2018_topcoders/')">https://github.com/selimsef/dsb2018_topcoders/</a>
 
 A model for DPNUnet has been **trained on very divergent biomedical data**, and will perform on many data-sets even without retraing.
-When peforming prediction, this pre-trained can be will be directly used (see secttion 'Model' for details). We also provide the 
+When peforming prediction, this pre-trained can be will be directly used (see secttion 'Model' for details). We also provide the
 possiblity to re-train this model, and use it for prediction after successful termination of the training.
 
 When starting the DPNUnet-Segmentation plugin, you will see a **central launch pad** allowing to select the task to be performed:
@@ -1017,7 +1017,7 @@ is smaller and prediction will be faster.
 Prediction will be performed with best available model. This is either a loaded pre-trained model, or in case
 re-training yielded better resuls, the re-trained model. More details can be found in the section 'Model'.
 
-**To be sure that you use a certain model**, e.g. the pre-trained model from the Kaggle challenge, **please load this model prior to prediction**. 
+**To be sure that you use a certain model**, e.g. the pre-trained model from the Kaggle challenge, **please load this model prior to prediction**.
 
 Please note that this model has been trained on nuclei with an **average size of 20 pixel**. For best performance,
 images should be rescaled such that the nuclei in the images are roughly this size.
@@ -1038,9 +1038,9 @@ images should be rescaled such that the nuclei in the images are roughly this si
 0. The predicted masks will be saved as `nuclei_border_mask_output.png` in each sample folder.
 0. To obtain the actual nuclei, a watershed segmentation is performed as follows: the predicted border is
  mask is substracted from the predicted filled mask. The resulting image is used as a seed for a watershed
- segmentation on the predicted filled mask. After identifying the individual nuclei, the results are stored as 
-    * `nuclei_border_mask_output_labels.png`: image where each identified nuclei is a filled mask with a constant intensity value. 
-    * `nuclei_border_mask_output_color_labels.png`: label image shown with a color-lookup table for inspection. 
+ segmentation on the predicted filled mask. After identifying the individual nuclei, the results are stored as
+    * `nuclei_border_mask_output_labels.png`: image where each identified nuclei is a filled mask with a constant intensity value.
+    * `nuclei_border_mask_output_color_labels.png`: label image shown with a color-lookup table for inspection.
 
 </attachment>
 
