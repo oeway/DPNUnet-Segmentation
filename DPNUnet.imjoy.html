@@ -1,4 +1,4 @@
-﻿<docs lang="markdown">
+<docs lang="markdown">
 Plugin framework for nuclear segmentation based on the winning approach (DPNUnet) of the 2018 Kaggle Data Science Bowl.
 
 Plugins for annotation, prediction, and training are provided.
@@ -11,7 +11,7 @@ Plugins for annotation, prediction, and training are provided.
 {
   "name": "DPNUnet",
   "type": "native-python",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "Nuclei segmentation with deep learning.",
   "tags": ["GPU"],
   "ui": "",
@@ -521,7 +521,7 @@ class ImJoyPlugin():
         # "Model Name {id: 'model_name', type: 'string', placeholder: 'dpnunet-model-1'}",
         "Epochs { id: 'epochs', type:'number', placeholder: 10000}",
         "Image file name { id: 'image_file_name', type:'string', placeholder: 'nuclei.png'}",
-        "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_boarder_mask.png'}",
+        "Mask file name { id: 'mask_file_name', type:'string', placeholder: 'nuclei_border_mask.png'}",
         ]))
 
         config = load_config('configs/imjoy_dpn_softmax.json')
@@ -531,6 +531,8 @@ class ImJoyPlugin():
         config.nb_epoch = options.epochs
         config.batch_size = 16
         config.epoch_size = 24
+        config.image_file_name = options.image_file_name
+        config.mask_file_name = options.mask_file_name
         paths, fn_mapping  = load_path_mapping(config, True)
         log_path =  os.path.join('..', 'logs', 'dpn_softmax_f0' 'fold0')
         save_path = os.path.join('..', 'weights', 'dpn_softmax_f0')
