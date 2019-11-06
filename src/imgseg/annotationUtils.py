@@ -513,17 +513,13 @@ class BorderMaskGenerator(MaskGenerator):
     https://github.com/selimsef/dsb2018_topcoders
     '''
 
-    def __init__(self):
-        pass
+    def __init__(self, border_detection_threshold=3):
+        self.border_detection_threshold = border_detection_threshold
 
     def generate(self, annot_dict, mask_dict):
         labels = mask_dict['labels']
-
-        tmp = morphology.dilation(labels > 0, morphology.square(9))
-        tmp2 = morphology.watershed(tmp, labels, mask=tmp, watershed_line=True) > 0
-        tmp = tmp ^ tmp2
+        tmp = mask_dict['edge'] > 0
         tmp = morphology.dilation(tmp, morphology.square(7))
-        msk = (255 * tmp).astype('uint8')
 
         props = measure.regionprops(labels)
         msk0 = 255 * (labels > 0)
@@ -537,23 +533,16 @@ class BorderMaskGenerator(MaskGenerator):
             for x0 in range(labels.shape[1]):
                 if not tmp[y0, x0]:
                     continue
-                if labels[y0, x0] == 0:
-                    if max_area > 4000:
-                        sz = 6
-                    else:
-                        sz = 3
-                else:
-                    sz = 3
-                    # if props[labels[y0, x0] - 1].area < 300:
-                    #     sz = 1
-                    # elif props[labels[y0, x0] - 1].area < 2000:
-                    #     sz = 2
+                sz = self.border_detection_threshold
+
                 uniq = np.unique(labels[max(0, y0-sz):min(labels.shape[0], y0+sz+1), max(0, x0-sz):min(labels.shape[1], x0+sz+1)])
                 if len(uniq[uniq > 0]) > 1:
                     msk1[y0, x0] = True
                     msk0[y0, x0] = 0
 
-        msk1 = 255 * msk1
+        msk0 = 255 * (labels > 0)
+        msk0 = msk0.astype('uint8') # cell area
+        msk1 = 255 * msk1 # cell boundarys
         msk1 = msk1.astype('uint8')
 
         msk2 = np.zeros_like(labels, dtype='uint8')
