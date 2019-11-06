@@ -513,7 +513,7 @@ class BorderMaskGenerator(MaskGenerator):
     https://github.com/selimsef/dsb2018_topcoders
     '''
 
-    def __init__(self, border_detection_threshold=3):
+    def __init__(self, border_detection_threshold=6):
         self.border_detection_threshold = border_detection_threshold
 
     def generate(self, annot_dict, mask_dict):
@@ -542,6 +542,7 @@ class BorderMaskGenerator(MaskGenerator):
 
         msk0 = 255 * (labels > 0)
         msk0 = msk0.astype('uint8') # cell area
+        msk1 = morphology.binary_closing(msk1)
         msk1 = 255 * msk1 # cell boundarys
         msk1 = msk1.astype('uint8')
 
