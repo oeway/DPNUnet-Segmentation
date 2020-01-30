@@ -2,6 +2,13 @@
 #import sys
 #sys.path.append('/usr/local/lib/python3.6/site-packages/')
 
+# This is needed for windows - otherwise shapely will not install
+conda config --add channels conda-forge
+conda install shapely
+
+# Pillow<7 is necessary to avoid error in torchvision:  ImportError: cannot import name 'PILLOW_VERSION'
+conda install pillow=6.1
+
 pip install tqdm
 
 pip install descartes palettable geojson read-roi gputil namedlist
